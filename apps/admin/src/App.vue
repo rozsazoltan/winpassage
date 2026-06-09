@@ -137,10 +137,19 @@ const canReset = computed(() => selectedUser.value.length > 0 && newPassword.val
 const canCreate = computed(() => createUsername.value.length > 0 && createPassword.value.length >= 12 && adminToken.value.length > 0);
 const canDelete = computed(() => selectedUser.value.length > 0 && deleteConfirmation.value === selectedUser.value && adminToken.value.length > 0);
 const canAddServer = computed(() => newServerName.value.trim().length > 0 && newServerHost.value.trim().length > 0 && Number(newServerPort.value) > 0);
-const canInstallServer = computed(
-  () => isElevated.value && installBindHost.value.trim().length > 0 && Number(installPort.value) > 0 && installAdminToken.value.trim().length >= 16,
-);
-const canDemoteServer = computed(() => isElevated.value && demoteConfirmation.value === 'DEMOTE SERVER');
+const installDisabledReason = computed(() => {
+  if (hostStatusLoading.value) return 'Checking local Windows privileges.';
+  if (hostStatus.value?.is_windows !== true) return 'Server installation is available only on Windows.';
+  if (!isHostAdmin.value) return 'Sign in with a local administrator account.';
+  if (!isElevated.value) return 'Run WinPassageAdmin as administrator to install the service.';
+  if (!installBindHost.value.trim()) return 'Set a bind host first.';
+  if (installAdminToken.value.trim().length > 0 && installAdminToken.value.trim().length < 16) return 'Use an admin token with at least 16 characters, or leave it empty to generate one.';
+  const port = Number(installPort.value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return 'Choose a valid TCP port between 1 and 65535.';
+  return '';
+});
+const canInstallServer = computed(() => installDisabledReason.value === '');
+const canDemoteServer = computed(() => isElevated.value && demoteConfirmation.value === 'REMOVE SERVER');
 
 function applyTheme() {
   const resolved = theme.value === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme.value;
@@ -367,6 +376,10 @@ async function logoffSession(session: LocalSessionSummary) {
 }
 
 async function installServer() {
+  if (!installAdminToken.value.trim()) {
+    installAdminToken.value = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().slice(0, 8);
+  }
+
   await runTask(async () => {
     const payload = await invoke<ServerInstallResult>('install_server_mode', {
       request: {
@@ -388,7 +401,7 @@ async function demoteServer() {
     const payload = await invoke<ServerInstallResult>('demote_server_mode', {
       request: {
         install_dir: installDir.value || null,
-        confirmation: demoteConfirmation.value,
+        confirmation: 'REMOVE SERVER',
         remove_files: demoteRemoveFiles.value,
       },
     });
@@ -438,14 +451,14 @@ onMounted(() => {
 <template>
   <main class="app app-admin">
     <section v-if="initialSetupOpen" class="setup-overlay" role="dialog" aria-modal="true">
-      <article class="setup-card compact-card">
+      <article class="setup-card">
         <div class="setup-brand" v-html="brandIcon"></div>
         <p class="eyebrow">Initial setup</p>
         <h1>Prepare WinPassageAdmin</h1>
-        <p class="lead">Add the central machine address. The guided tour starts after this step.</p>
+        <p class="lead">Set the server address and token. The guided tour starts after setup.</p>
         <div class="form-grid two">
           <label>Server address<input v-model="serverUrl" placeholder="http://192.168.1.10:4487" /></label>
-          <label>Admin token<input v-model="adminToken" type="password" autocomplete="off" placeholder="Session token" /></label>
+          <label>Admin token<input v-model="adminToken" type="password" autocomplete="off" placeholder="Admin token" /></label>
         </div>
         <div class="button-row end">
           <button class="btn-primary" :disabled="!serverUrl.trim()" @click="finishInitialSetup">Save and continue</button>
@@ -459,7 +472,7 @@ onMounted(() => {
           <span class="app-mark" v-html="brandIcon"></span>
           <div>
             <p class="brand-title">WinPassageAdmin</p>
-            <p class="brand-subtitle">Local Windows control</p>
+            <p class="brand-subtitle">Windows Pro bridge</p>
           </div>
         </div>
 
@@ -482,60 +495,77 @@ onMounted(() => {
             <h1>{{ currentPage.label }}</h1>
           </div>
           <div class="topbar-actions">
-            <button class="btn-ghost" @click="initialSetupOpen = true"><span v-html="icon('settings')"></span>Initial setup</button>
+            <button class="btn-ghost" @click="initialSetupOpen = true"><span v-html="icon('settings')"></span>Setup</button>
             <button class="btn-ghost" @click="startAdminTour(true)"><span v-html="icon('play')"></span>Guide</button>
             <button class="btn-primary" :disabled="loading || !canLoadRemoteData" @click="refreshAll"><span v-html="icon('refresh')"></span>Refresh</button>
           </div>
         </header>
 
-        <section v-if="isLocked" class="lock-panel surface-card">
+        <section v-if="isLocked" class="lock-panel">
           <span class="lock-mark" v-html="brandIcon"></span>
           <h2>Administrator account required</h2>
-          <p>Sign in with a Windows account that belongs to the local Administrators group to use WinPassageAdmin.</p>
-          <p class="muted">Current status: {{ hostStatus?.message || 'Checking account privileges…' }}</p>
+          <p>Sign in with a Windows local administrator account to use WinPassageAdmin.</p>
+          <p class="muted">{{ hostStatus?.message || 'Checking account privileges…' }}</p>
         </section>
 
         <template v-else>
-          <p v-if="hostStatus && !isElevated" class="notice info"><span v-html="icon('info')"></span>{{ hostStatus.message }}</p>
           <p v-if="message" class="notice success"><span v-html="icon('check')"></span>{{ message }}</p>
           <p v-if="error" class="notice error"><span v-html="icon('warning')"></span>{{ error }}</p>
 
           <section v-if="activeTab === 'overview'" class="page-stack">
-            <div class="overview-grid">
-              <article id="admin-server" class="surface-card hero-card">
+            <article v-if="hostStatus && !isElevated" class="notice info">
+              <span v-html="icon('info')"></span>{{ hostStatus.message }}
+            </article>
+
+            <div class="page-grid two">
+              <article class="surface-card" id="admin-install">
                 <div class="card-title-row">
-                  <div><h2>Server status</h2><p>Monitor the selected central machine.</p></div>
-                  <span class="pill" :class="canLoadRemoteData ? 'success' : 'neutral'">{{ canLoadRemoteData ? 'Configured' : 'Needs token' }}</span>
+                  <div>
+                    <h2>Server on this computer</h2>
+                    <p>Install the WinPassage service locally with one action.</p>
+                  </div>
+                  <span class="hero-mark" v-html="brandIcon"></span>
                 </div>
                 <div class="stat-list">
+                  <span>Status</span><strong>{{ hostStatus?.service_installed ? 'Installed' : 'Not installed' }}</strong>
+                  <span>Address</span><strong>{{ installBindHost }}:{{ installPort }}</strong>
+                  <span>Folder</span><strong>{{ installDir }}</strong>
+                </div>
+                <p v-if="installDisabledReason" class="notice info"><span v-html="icon('info')"></span>{{ installDisabledReason }}</p>
+                <button class="btn-primary full" :disabled="loading || !canInstallServer" @click="installServer">Install server on this computer</button>
+              </article>
+
+              <article class="surface-card" id="admin-server">
+                <div class="card-title-row">
+                  <div><h2>Active profile</h2><p>Connection shortcut for the selected central machine.</p></div>
+                </div>
+                <div class="stat-list">
+                  <span>Name</span><strong>{{ activeServerProfile?.name }}</strong>
                   <span>Endpoint</span><strong>{{ serverUrl }}</strong>
-                  <span>Windows users</span><strong>{{ users.length || '—' }}</strong>
-                  <span>Active sessions</span><strong>{{ activeSessions || '—' }}</strong>
+                  <span>Loaded users</span><strong>{{ users.length }}</strong>
+                  <span>Sessions</span><strong>{{ sessions.length }}</strong>
                 </div>
               </article>
-
-              <article class="surface-card">
-                <h2>Access</h2>
-                <p class="muted">Install and uninstall actions require elevation. Browsing settings is available for local administrators.</p>
-                <button class="btn-secondary" @click="activeTab = 'servers'">Manage server</button>
-              </article>
-            </div>
-
-            <div class="overview-grid three">
-              <article class="surface-card metric"><span v-html="icon('users')"></span><p>Users</p><strong>{{ users.length }}</strong></article>
-              <article class="surface-card metric"><span v-html="icon('shield')"></span><p>Administrators</p><strong>{{ adminUsers }}</strong></article>
-              <article class="surface-card metric"><span v-html="icon('sessions')"></span><p>Sessions</p><strong>{{ sessions.length }}</strong></article>
             </div>
 
             <article class="surface-card guide-card">
-              <div><h2>Getting started</h2><p>Configure a server profile, enter the admin token, then load users and sessions.</p></div>
-              <button class="btn-primary" @click="startAdminTour(true)"><span v-html="icon('play')"></span>Start guided tour</button>
+              <div>
+                <h2>Initial setup and guided tour</h2>
+                <p class="muted">Finish setup first, then use the tour when you need orientation.</p>
+              </div>
+              <div class="button-row">
+                <button class="btn-secondary" @click="initialSetupOpen = true">Initial setup</button>
+                <button class="btn-secondary" @click="startAdminTour(true)"><span v-html="icon('play')"></span>Start tour</button>
+              </div>
             </article>
           </section>
 
           <section v-if="activeTab === 'users'" id="admin-users" class="page-grid two-wide">
             <article class="surface-card table-card">
-              <div class="card-title-row"><div><h2>Local users</h2><p>Read directly from the selected Windows machine.</p></div><span class="pill neutral">{{ users.length }} users</span></div>
+              <div class="card-title-row">
+                <div><h2>Windows users</h2><p>Read directly from this Windows machine.</p></div>
+                <span class="pill neutral">{{ users.length }} users</span>
+              </div>
               <div class="table-wrap">
                 <table class="data-table">
                   <thead><tr><th>User</th><th>Name</th><th>Status</th><th>Access</th><th>Sessions</th></tr></thead>
@@ -550,7 +580,7 @@ onMounted(() => {
                   </tbody>
                 </table>
               </div>
-              <div v-if="users.length === 0" class="empty-state"><span v-html="brandIcon"></span><p>No users loaded yet.</p></div>
+              <div v-if="users.length === 0" class="empty-state"><span v-html="brandIcon"></span><h3>No users loaded</h3><p>Refresh after entering the admin token.</p></div>
             </article>
 
             <aside class="side-panel">
@@ -558,38 +588,48 @@ onMounted(() => {
                 <h2>Create user</h2>
                 <div class="form-grid">
                   <label>Username<input v-model="createUsername" placeholder="julia" /></label>
-                  <label>Full name<input v-model="createFullName" placeholder="Julia Nagy" /></label>
                   <label>Initial password<input v-model="createPassword" type="password" autocomplete="new-password" /></label>
                 </div>
-                <label class="check-row"><input v-model="createMustChange" type="checkbox" />Require change at next sign-in</label>
-                <label class="check-row"><input v-model="createEnabled" type="checkbox" />Enable account</label>
-                <label class="check-row"><input v-model="createAdmin" type="checkbox" />Add to Administrators</label>
+                <details class="advanced">
+                  <summary>More options</summary>
+                  <div class="form-grid">
+                    <label>Full name<input v-model="createFullName" placeholder="Julia Nagy" /></label>
+                    <label class="check-row"><input v-model="createMustChange" type="checkbox" />Require change at next sign-in</label>
+                    <label class="check-row"><input v-model="createEnabled" type="checkbox" />Enable account</label>
+                    <label class="check-row"><input v-model="createAdmin" type="checkbox" />Add to Administrators</label>
+                  </div>
+                </details>
                 <button class="btn-primary full" :disabled="loading || !canCreate" @click="createUser">Create user</button>
               </article>
 
-              <article class="surface-card danger-zone">
-                <h2>Selected account</h2>
+              <article class="surface-card">
+                <h2>Selected user</h2>
                 <p class="muted">{{ selectedUserRecord?.username || 'No user selected' }}</p>
                 <label>New password<input v-model="newPassword" type="password" autocomplete="new-password" /></label>
-                <label>Audit reason<textarea v-model="reason" rows="3" placeholder="Reason for this change"></textarea></label>
+                <label>Audit reason<textarea v-model="reason" rows="2" placeholder="Reason"></textarea></label>
                 <div class="button-grid">
-                  <button class="btn-primary" :disabled="loading || !canReset" @click="resetPassword">Reset password</button>
+                  <button class="btn-primary" :disabled="loading || !canReset" @click="resetPassword">Reset</button>
                   <button class="btn-secondary" :disabled="loading || !selectedUser" @click="setEnabled(true)">Enable</button>
                   <button class="btn-secondary" :disabled="loading || !selectedUser" @click="setEnabled(false)">Disable</button>
                   <button class="btn-secondary" :disabled="loading || !selectedUser" @click="setAdministrator(true)">Grant admin</button>
-                  <button class="btn-danger" :disabled="loading || !selectedUser" @click="setAdministrator(false)">Revoke admin</button>
                 </div>
-                <label>Type username to delete<input v-model="deleteConfirmation" :placeholder="selectedUser || 'username'" /></label>
-                <label class="check-row"><input v-model="deleteLogoffSessions" type="checkbox" />Log off sessions first</label>
-                <label class="check-row"><input v-model="deleteProfile" type="checkbox" />Request profile deletion</label>
-                <button class="btn-danger full" :disabled="loading || !canDelete" @click="deleteUser">Delete account</button>
+                <details class="advanced">
+                  <summary>Danger zone</summary>
+                  <div class="form-grid">
+                    <button class="btn-danger" :disabled="loading || !selectedUser" @click="setAdministrator(false)">Revoke admin</button>
+                    <label>Type username to delete<input v-model="deleteConfirmation" :placeholder="selectedUser || 'username'" /></label>
+                    <label class="check-row"><input v-model="deleteLogoffSessions" type="checkbox" />Log off sessions first</label>
+                    <label class="check-row"><input v-model="deleteProfile" type="checkbox" />Request profile deletion</label>
+                    <button class="btn-danger full" :disabled="loading || !canDelete" @click="deleteUser">Delete account</button>
+                  </div>
+                </details>
               </article>
             </aside>
           </section>
 
           <section v-if="activeTab === 'sessions'" class="page-stack">
             <article class="surface-card table-card">
-              <div class="card-title-row"><div><h2>Sessions</h2><p>Log off active Windows sessions when needed.</p></div><span class="pill neutral">{{ sessions.length }} sessions</span></div>
+              <div class="card-title-row"><div><h2>Sessions</h2><p>Log off active Windows sessions when required.</p></div><span class="pill neutral">{{ sessions.length }} sessions</span></div>
               <div class="table-wrap">
                 <table class="data-table">
                   <thead><tr><th>ID</th><th>User</th><th>State</th><th>Client</th><th></th></tr></thead>
@@ -604,54 +644,34 @@ onMounted(() => {
             </article>
           </section>
 
-          <section v-if="activeTab === 'servers'" id="admin-install" class="page-grid two-wide">
+          <section v-if="activeTab === 'servers'" class="page-grid two-wide">
             <article class="surface-card">
-              <div class="card-title-row"><div><h2>Server profiles</h2><p>Connection shortcuts only. Users are never stored here.</p></div></div>
+              <div class="card-title-row"><div><h2>Server profiles</h2><p>IP:port shortcuts for standalone Windows Pro machines.</p></div></div>
               <div class="profile-list">
                 <button v-for="profile in serverProfiles" :key="profile.id" class="profile-row" :class="{ selected: activeServerId === profile.id }" @click="selectServerProfile(profile)">
                   <span><strong>{{ profile.name }}</strong><small>{{ profile.network_name }} · {{ profile.host }}:{{ profile.port }}</small></span>
                   <span v-html="icon('chevronRight')"></span>
                 </button>
               </div>
-              <div class="form-grid two">
-                <label>Name<input v-model="newServerName" placeholder="Front office" /></label>
-                <label>Network<input v-model="newServerNetwork" placeholder="Budapest" /></label>
-                <label>Host<input v-model="newServerHost" placeholder="192.168.1.10" /></label>
-                <label>Port<input v-model.number="newServerPort" type="number" min="1" max="65535" /></label>
-                <label>Protocol<select v-model="newServerProtocol"><option value="http">http</option><option value="https">https</option></select></label>
-                <label>Notes<input v-model="newServerNotes" placeholder="Optional" /></label>
-              </div>
-              <div class="button-row"><button class="btn-secondary" :disabled="!canAddServer" @click="addServerProfile">Add profile</button><button class="btn-ghost" :disabled="!activeServerProfile" @click="activeServerProfile && removeServerProfile(activeServerProfile)">Remove selected</button></div>
             </article>
 
             <aside class="side-panel">
               <article class="surface-card">
-                <h2>Connection</h2>
-                <label>Active server URL<input v-model="serverUrl" placeholder="http://192.168.1.10:4487" /></label>
-                <label>Admin token<input v-model="adminToken" type="password" autocomplete="off" /></label>
-                <button class="btn-primary full" :disabled="loading || !canLoadRemoteData" @click="refreshAll">Load data</button>
-              </article>
-
-              <article class="surface-card">
-                <h2>Install server service</h2>
-                <p class="muted">Copies service executables and installs the Windows Service on this computer.</p>
+                <h2>Add profile</h2>
                 <div class="form-grid">
-                  <label>Source folder<input v-model="installSourceDir" /></label>
-                  <label>Install folder<input v-model="installDir" /></label>
-                  <label>Bind host<input v-model="installBindHost" /></label>
-                  <label>Port<input v-model.number="installPort" type="number" min="1" max="65535" /></label>
-                  <label>Admin token<input v-model="installAdminToken" type="password" /></label>
+                  <label>Name<input v-model="newServerName" placeholder="Front office" /></label>
+                  <label>Host<input v-model="newServerHost" placeholder="192.168.1.10" /></label>
+                  <label>Port<input v-model.number="newServerPort" type="number" min="1" max="65535" /></label>
                 </div>
-                <label class="check-row"><input v-model="installRequireTls" type="checkbox" />Require TLS boundary</label>
-                <p class="muted">URL: {{ installServerUrl }}</p>
-                <button class="btn-primary full" :disabled="loading || !canInstallServer" @click="installServer">Install server</button>
-              </article>
-
-              <article class="surface-card danger-zone">
-                <h2>Return to client-only</h2>
-                <label>Type DEMOTE SERVER<input v-model="demoteConfirmation" /></label>
-                <label class="check-row"><input v-model="demoteRemoveFiles" type="checkbox" />Remove copied executables</label>
-                <button class="btn-danger full" :disabled="loading || !canDemoteServer" @click="demoteServer">Remove server service</button>
+                <details class="advanced">
+                  <summary>More options</summary>
+                  <div class="form-grid">
+                    <label>Network<input v-model="newServerNetwork" placeholder="Budapest" /></label>
+                    <label>Protocol<select v-model="newServerProtocol"><option value="http">http</option><option value="https">https</option></select></label>
+                    <label>Notes<input v-model="newServerNotes" placeholder="Optional" /></label>
+                  </div>
+                </details>
+                <div class="button-row"><button class="btn-primary" :disabled="!canAddServer" @click="addServerProfile">Add profile</button><button class="btn-ghost" :disabled="!activeServerProfile" @click="activeServerProfile && removeServerProfile(activeServerProfile)">Remove selected</button></div>
               </article>
             </aside>
           </section>
@@ -659,17 +679,43 @@ onMounted(() => {
           <section v-if="activeTab === 'settings'" id="admin-settings" class="page-grid two">
             <article class="surface-card">
               <h2>Appearance</h2>
-              <p class="muted">Choose a calm interface theme.</p>
+              <p class="muted">Choose the interface theme.</p>
               <div class="segmented">
                 <button :class="{ active: theme === 'light' }" @click="setTheme('light')"><span v-html="icon('sun')"></span>Light</button>
                 <button :class="{ active: theme === 'system' }" @click="setTheme('system')"><span v-html="icon('monitor')"></span>System</button>
                 <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')"><span v-html="icon('moon')"></span>Dark</button>
               </div>
             </article>
+
             <article class="surface-card">
-              <h2>About</h2>
-              <p class="muted">WinPassageAdmin can be installed next to WinPassageClient on the same computer.</p>
-              <button class="btn-secondary" @click="startAdminTour(true)">Replay guided tour</button>
+              <h2>Server install settings</h2>
+              <p class="muted">Used by the one-click local install action.</p>
+              <div class="form-grid two">
+                <label>Bind host<input v-model="installBindHost" /></label>
+                <label>Port<input v-model.number="installPort" type="number" min="1" max="65535" /></label>
+                <label>Install folder<input v-model="installDir" /></label>
+                <label>Source folder<input v-model="installSourceDir" /></label>
+              </div>
+              <label class="check-row"><input v-model="installRequireTls" type="checkbox" />Require TLS boundary</label>
+            </article>
+
+            <article class="surface-card">
+              <h2>Guided tour</h2>
+              <p class="muted">Replay onboarding at any time.</p>
+              <button class="btn-secondary" @click="startAdminTour(true)">Replay tour</button>
+            </article>
+
+            <article class="surface-card">
+              <h2>Advanced</h2>
+              <details class="advanced">
+                <summary>Remove local server service</summary>
+                <div class="form-grid">
+                  <p class="muted">Stops and removes the WinPassage service from this computer. It does not delete Windows users.</p>
+                  <label>Type REMOVE SERVER<input v-model="demoteConfirmation" placeholder="REMOVE SERVER" /></label>
+                  <label class="check-row"><input v-model="demoteRemoveFiles" type="checkbox" />Remove copied executables</label>
+                  <button class="btn-danger full" :disabled="loading || !canDemoteServer" @click="demoteServer">Remove server service</button>
+                </div>
+              </details>
             </article>
           </section>
         </template>

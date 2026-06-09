@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const INSTALL_DIR: &str = r"C:\Program Files\WinPassage";
+const SERVICE_NAME: &str = "WinPassage";
 const SERVICE_BINARIES: [&str; 3] = [
     "winpassage-server.exe",
     "winpassage-agentctl.exe",
@@ -15,6 +16,7 @@ struct AdminHostStatus {
     is_windows: bool,
     is_admin_account: bool,
     is_elevated: bool,
+    service_installed: bool,
     install_dir: String,
     executable_dir: Option<String>,
     message: String,
@@ -53,6 +55,7 @@ fn get_admin_host_status() -> AdminHostStatus {
     let is_windows = cfg!(windows);
     let is_admin_account = is_local_admin_account();
     let is_elevated = is_process_elevated();
+    let service_installed = is_service_installed();
     let executable_dir = std::env::current_exe()
         .ok()
         .and_then(|path| path.parent().map(Path::to_path_buf))
@@ -74,6 +77,7 @@ fn get_admin_host_status() -> AdminHostStatus {
         is_windows,
         is_admin_account,
         is_elevated,
+        service_installed,
         install_dir: INSTALL_DIR.to_string(),
         executable_dir,
         message,
@@ -84,7 +88,7 @@ fn get_admin_host_status() -> AdminHostStatus {
 fn install_server_mode(request: InstallServerRequest) -> Result<ServerInstallResult, String> {
     ensure_elevated()?;
     validate_bind_host(&request.bind_host)?;
-    if request.admin_token.trim().len() < 16 {
+    if !request.admin_token.trim().is_empty() && request.admin_token.trim().len() < 16 {
         return Err(
             "Admin token must be at least 16 characters for a server installation.".to_string(),
         );
@@ -161,8 +165,8 @@ fn install_server_mode(request: InstallServerRequest) -> Result<ServerInstallRes
 #[tauri::command]
 fn demote_server_mode(request: DemoteServerRequest) -> Result<ServerInstallResult, String> {
     ensure_elevated()?;
-    if request.confirmation.trim() != "DEMOTE SERVER" {
-        return Err("Type DEMOTE SERVER to confirm server demotion.".to_string());
+    if request.confirmation.trim() != "REMOVE SERVER" {
+        return Err("Type REMOVE SERVER to confirm server removal.".to_string());
     }
 
     let install_dir = request
@@ -239,6 +243,22 @@ fn is_process_elevated() -> bool {
     #[cfg(not(windows))]
     {
         true
+    }
+}
+
+fn is_service_installed() -> bool {
+    #[cfg(windows)]
+    {
+        Command::new("sc")
+            .args(["query", SERVICE_NAME])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(windows))]
+    {
+        false
     }
 }
 
