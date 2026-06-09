@@ -25,9 +25,7 @@ enum Command {
         version: String,
     },
     /// Verify whether a URL is accepted by the updater source policy.
-    VerifyUrl {
-        url: String,
-    },
+    VerifyUrl { url: String },
     /// Print the expected asset name for a release component.
     Asset {
         #[arg(long)]
@@ -153,8 +151,10 @@ mod tests {
 
     #[test]
     fn accepts_official_release_metadata_urls() {
-        assert_allowed_update_url("https://api.github.com/repos/rozsazoltan/winpassage/releases/latest")
-            .expect("official release metadata should be accepted");
+        assert_allowed_update_url(
+            "https://api.github.com/repos/rozsazoltan/winpassage/releases/latest",
+        )
+        .expect("official release metadata should be accepted");
     }
 
     #[test]
