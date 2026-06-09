@@ -1,0 +1,36 @@
+{
+  "name": "winpassage",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev:admin": "aube run tauri:dev --filter winpassage-admin",
+    "dev:client": "aube run tauri:dev --filter winpassage-client",
+    "build:admin": "aube run tauri:build --filter winpassage-admin",
+    "build:client": "aube run tauri:build --filter winpassage-client",
+    "build:server": "cargo build --release -p winpassage-server",
+    "build:agentctl": "cargo build --release -p winpassage-agentctl",
+    "fmt:rust": "cargo fmt --all",
+    "fmt:rust:check": "cargo fmt --all -- --check",
+    "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
+    "test:rust": "cargo test --workspace",
+    "check:rust": "cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && cargo test --workspace --doc && cargo doc --workspace --no-deps",
+    "check:js": "aube run typecheck --filter winpassage-admin && aube run typecheck --filter winpassage-client && aube run test --filter winpassage-admin && aube run test --filter winpassage-client && aube run build --filter winpassage-admin && aube run build --filter winpassage-client",
+    "typecheck:js": "aube run typecheck --filter winpassage-admin && aube run typecheck --filter winpassage-client",
+    "test:js": "aube run test --filter winpassage-admin && aube run test --filter winpassage-client",
+    "build:js": "aube run build --filter winpassage-admin && aube run build --filter winpassage-client",
+    "check:all": "aube run check:rust && aube run check:js"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rozsazoltan/winpassage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rozsazoltan/winpassage/issues"
+  },
+  "homepage": "https://github.com/rozsazoltan/winpassage#readme"
+}

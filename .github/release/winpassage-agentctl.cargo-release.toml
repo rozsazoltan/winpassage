@@ -1,0 +1,29 @@
+[project]
+root = "."
+binary = "winpassage-agentctl"
+
+[build]
+out_dir = "dist/release/winpassage-agentctl"
+default_strategy = "host"
+container_engine = "podman"
+
+[artifacts]
+checksum = true
+manifest = true
+name_template = "winpassage-agentctl-v{version}-{target}{ext}"
+
+[targets.windows-x64]
+enabled = true
+triple = "x86_64-pc-windows-msvc"
+strategy = "host"
+command = "rust-cache run --config rust-cache.toml -- cargo build --release -p winpassage-agentctl --target x86_64-pc-windows-msvc"
+artifacts = [".cache/rust/packages/winpassage/target/x86_64-pc-windows-msvc/release/winpassage-agentctl.exe"]
+
+[targets.linux-x64]
+enabled = false
+
+[targets.macos-x64]
+enabled = false
+
+[targets.macos-arm64]
+enabled = false

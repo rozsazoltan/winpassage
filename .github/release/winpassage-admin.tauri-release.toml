@@ -1,0 +1,37 @@
+[project]
+project_dir = "apps/admin"
+package_manager = "aube"
+install_command = "aube install"
+
+[output]
+clean = true
+sha256 = true
+manifest = true
+
+[artifacts]
+include_extensions = ["exe", "msi", "zip", "sig"]
+include_files = ["latest.json", "release.json", "release-manifest.json"]
+keep_relative_paths = false
+allow_empty = false
+
+[linux]
+enabled = false
+strategy = "disabled"
+
+[windows]
+enabled = true
+strategy = "host-only"
+bundles = ["nsis", "msi"]
+targets = ["x86_64-pc-windows-msvc"]
+
+[macos]
+enabled = false
+strategy = "disabled"
+
+[android]
+enabled = false
+strategy = "disabled"
+
+[ios]
+enabled = false
+strategy = "disabled"

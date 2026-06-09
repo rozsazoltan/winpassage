@@ -1,0 +1,31 @@
+{
+  "name": "winpassage-admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:build": "tauri build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "catalog:",
+    "@tauri-apps/plugin-opener": "catalog:",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vue-tsc": "catalog:",
+    "vitest": "catalog:"
+  },
+  "license": "AGPL-3.0-only"
+}

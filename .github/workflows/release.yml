@@ -1,0 +1,230 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without a leading v, for example 0.2.0"
+        required: true
+        type: string
+      ref:
+        description: "Target branch to release from and merge back into"
+        required: false
+        default: master
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  RELEASE_ARTIFACT_DIR: dist/release-artifacts
+  RELEASE_UPLOAD_DIR: dist/release-upload
+
+jobs:
+  prepare-release:
+    name: Prepare release branch
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      version_tag: ${{ steps.prepare.outputs.version_tag }}
+      release_branch: ${{ steps.prepare.outputs.release_branch }}
+      target_branch: ${{ steps.prepare.outputs.target_branch }}
+      release_sha: ${{ steps.prepare.outputs.release_sha }}
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install github-release
+        uses: verzly/github-release@v0
+        with:
+          install-only: true
+
+      - name: Prepare release branch
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          github-release prepare \
+            --version "${{ inputs.version }}" \
+            --target-branch "${{ inputs.ref }}" \
+            --config ".github/release/winpassage.github-release.toml"
+
+  build-service:
+    name: Build service binaries
+    needs: prepare-release
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - binary: winpassage-server
+            config: .github/release/winpassage-server.cargo-release.toml
+          - binary: winpassage-agentctl
+            config: .github/release/winpassage-agentctl.cargo-release.toml
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_branch }}
+          fetch-depth: 0
+
+      - name: Install github-release
+        uses: verzly/github-release@v0
+        with:
+          install-only: true
+
+      - name: Verify release branch commit
+        shell: bash
+        run: github-release assert-head --sha "${{ needs.prepare-release.outputs.release_sha }}"
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup update stable
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Install cargo-release
+        uses: verzly/cargo-release@v0
+        with:
+          install-only: true
+
+      - name: Install rust-cache
+        uses: verzly/rust-cache@v0
+        with:
+          install-only: true
+
+      - name: Build ${{ matrix.binary }}
+        shell: bash
+        run: |
+          cargo-release build \
+            --config "${{ matrix.config }}" \
+            --output "dist/release/${{ matrix.binary }}" \
+            --windows-x64 \
+            --verbose
+
+      - name: Upload service artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.binary }}-windows
+          path: dist/release/${{ matrix.binary }}/**/*
+          if-no-files-found: error
+          retention-days: 7
+
+  build-tauri:
+    name: Build Tauri apps
+    needs: prepare-release
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: admin
+            config: .github/release/winpassage-admin.tauri-release.toml
+          - app: client
+            config: .github/release/winpassage-client.tauri-release.toml
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_branch }}
+          fetch-depth: 0
+
+      - name: Install github-release
+        uses: verzly/github-release@v0
+        with:
+          install-only: true
+
+      - name: Verify release branch commit
+        shell: bash
+        run: github-release assert-head --sha "${{ needs.prepare-release.outputs.release_sha }}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up aube
+        uses: verzly/setup-aube@v1
+        with:
+          run_install: true
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup update stable
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Install tauri-release
+        uses: verzly/tauri-release@v0
+        with:
+          install-only: true
+
+      - name: Build ${{ matrix.app }}
+        shell: bash
+        run: |
+          tauri-release build \
+            --config "${{ matrix.config }}" \
+            --output "dist/release/winpassage-${{ matrix.app }}" \
+            --windows \
+            --verbose
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: winpassage-${{ matrix.app }}-windows
+          path: dist/release/winpassage-${{ matrix.app }}/**/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [prepare-release, build-service, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_branch }}
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: ${{ env.RELEASE_ARTIFACT_DIR }}
+
+      - name: Stage upload directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RELEASE_UPLOAD_DIR}"
+          find "${RELEASE_ARTIFACT_DIR}" -type f -exec cp {} "${RELEASE_UPLOAD_DIR}" \;
+          find "${RELEASE_UPLOAD_DIR}" -type f -maxdepth 1 -print | sort
+
+      - name: Install github-release
+        uses: verzly/github-release@v0
+        with:
+          install-only: true
+
+      - name: Finalize release
+        shell: bash
+        run: |
+          set -euo pipefail
+          github-release finalize \
+            --config ".github/release/winpassage.github-release.toml" \
+            --target-branch "${{ needs.prepare-release.outputs.target_branch }}" \
+            --release-branch "${{ needs.prepare-release.outputs.release_branch }}" \
+            --version "${{ needs.prepare-release.outputs.version }}" \
+            --artifact-dir "${RELEASE_UPLOAD_DIR}"

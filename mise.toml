@@ -1,0 +1,10 @@
+[tools]
+node = "24"
+aube = "latest"
+rust = "stable"
+
+[tasks."check:rust"]
+run = "cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && cargo test --workspace --doc && cargo doc --workspace --no-deps"
+
+[tasks."check:js"]
+run = "aube run check:js"
