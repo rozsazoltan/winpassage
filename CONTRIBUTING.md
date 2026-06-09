@@ -203,10 +203,10 @@ Keep this split:
 
 Use the published Verzly action line:
 
-- `verzly/rust-cache@v0`
-- `verzly/cargo-release@v0`
+- `verzly/rust-cache@latest`
+- `verzly/cargo-release@latest`
 - `verzly/github-release@latest`
-- `verzly/tauri-release@v0`
+- `verzly/tauri-release@latest`
 - `verzly/setup-aube@v1`
 
 Only update major action refs when the matching distribution repository has the new major tag.
@@ -243,6 +243,16 @@ The intended flow:
 6. upload artifacts to GitHub Release
 7. merge release branch back to master
 ```
+
+The release workflow invokes release builders with their current documented CLI shape:
+
+```bash
+cargo-release build --config .github/release/winpassage-server.cargo-release.toml
+tauri-release build --config .github/release/winpassage-admin.tauri-release.toml
+```
+
+Do not pass `--output`, `--windows`, or `--verbose` to `tauri-release build`. Output directories, platform enablement, commands, and artifact globs belong in the `.tauri-release.toml` files.
+
 
 ## Documentation
 
