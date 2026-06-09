@@ -150,7 +150,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo-release build --config "${{ matrix.config }}"
+          cargo-release build \
+            --config "${{ matrix.config }}" \
+            --version "${{ needs.prepare-release.outputs.version }}" \
+            --target windows-x64
 
       - name: Upload service artifact
         uses: actions/upload-artifact@v7
@@ -347,6 +350,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          github-release abort \
+          github-release cleanup \
             --config ".github/release/winpassage.github-release.toml" \
             --release-branch "${{ needs.prepare-release.outputs.release_branch }}"

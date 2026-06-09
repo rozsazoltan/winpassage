@@ -458,3 +458,30 @@ Do not replace Windows Rust workflow commands with `bash -lc` inside `rust-cache
 ## Node and aube workflow rules
 
 Use Node.js 24 for every GitHub Actions job that runs aube, frontend checks, or Tauri JavaScript build steps. Prefer a workflow-level `NODE_VERSION: "24"` environment variable and reference it from `actions/setup-node`. Set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` at workflow level, and keep first-party cache usage on `actions/cache@v5` or newer. Do not reintroduce pnpm, npm install, Node version drift, or Node.js 20-based action versions into CI. If JS dependency caching is needed, cache the aube store/cache only and recreate `node_modules` inside each job.
+
+
+## Release artifact versioning
+
+`cargo-release build` must receive the prepared release version explicitly:
+
+```sh
+cargo-release build --config <config> --version <release-version> --target windows-x64
+```
+
+Do not rely on the cargo-release default version. Without `--version`, service artifacts are named with the `dev` placeholder, for example `winpassage-server-vdev-windows-x64.exe`, even when the GitHub Release itself is `vX.Y.Z`.
+
+Failed release branch cleanup should use `github-release cleanup` after a successful prepare step. Do not add prepare-before-cleanup behavior unless the release process intentionally diverges from the Nutrino-style flow.
+
+## v24 product rules
+
+- Keep the desktop app names without spaces: `WinPassageAdmin` and `WinPassageClient`.
+- The two desktop apps may be installed on the same Windows computer. They must remain separate apps with separate identifiers.
+- Do not add server installation or service-management features to `WinPassageClient`.
+- `WinPassageAdmin` may open for a local administrator account even when the process is not elevated, but local service install/remove commands must still require an elevated process.
+- Standard Windows users must see the locked admin screen and instructions to switch to a local administrator account.
+- Do not ship default mapped drives. Client drive settings must start empty and be explicitly configured by the operator/user.
+- Drive mappings must be manageable individually: add, edit, mount, unmount, and delete.
+- Keep UI copy short and operational. Avoid AI-style marketing language. Prefer Microsoft/Google-style product surfaces: clear headings, concise helper text, predictable buttons, and restrained visual effects.
+- App onboarding uses `driver.js`; run initial setup before starting the tour.
+- Icons must represent a Windows Pro bridge/gateway concept. Do not use `WP` lettermark icons.
+- Release rollback belongs in the manual `Delete Release` workflow. It must require explicit `DELETE X.Y.Z` confirmation and delete both the GitHub Release and matching tag.

@@ -86,7 +86,7 @@ Build release binaries on Windows:
 cargo build --release -p winpassage-server -p winpassage-agentctl -p winpassage-updater
 ```
 
-The preferred operator flow is to place the three service executables next to WinPassage Admin and use the admin app's **Make this computer a WinPassage server** button.
+The preferred operator flow is to place the three service executables next to WinPassageAdmin and use the admin app's **Make this computer a WinPassage server** button.
 
 Manual service install remains available for validation:
 
@@ -218,14 +218,14 @@ The release workflow uses `verzly/github-release@latest` for `prepare`, `finaliz
 
 `winpassage-updater` is the dedicated update entrypoint. It must only resolve metadata and release assets from `https://github.com/rozsazoltan/winpassage` and the matching GitHub releases API. Do not add custom update hosts, mirrors, or user-configurable repositories.
 
-## Server installation from WinPassage Admin
+## Server installation from WinPassageAdmin
 
-WinPassage Client must stay client-only. Do not add service installation, server demotion, or local machine management features to the client app.
+WinPassageClient must stay client-only. Do not add service installation, server demotion, or local machine management features to the client app.
 
-The server installation flow belongs to WinPassage Admin only:
+The server installation flow belongs to WinPassageAdmin only:
 
 ```text
-WinPassage Admin -> copy service binaries -> install Windows Service -> start service
+WinPassageAdmin -> copy service binaries -> install Windows Service -> start service
 ```
 
 The admin app requires an elevated Windows administrator account before showing the normal console. If it is opened from a standard account, it must show the lock screen and instructions to switch to an administrator account.
@@ -242,3 +242,35 @@ The install form should collect:
 ```
 
 The demotion flow removes only the WinPassage service and optionally the copied WinPassage executables. It must not delete Windows users, Windows profiles, shares, mapped drives, or audit logs.
+
+
+## Release artifact versioning
+
+`cargo-release build` must receive the prepared release version explicitly:
+
+```sh
+cargo-release build --config <config> --version <release-version> --target windows-x64
+```
+
+Do not rely on the cargo-release default version. Without `--version`, service artifacts are named with the `dev` placeholder, for example `winpassage-server-vdev-windows-x64.exe`, even when the GitHub Release itself is `vX.Y.Z`.
+
+Failed release branch cleanup should use `github-release cleanup` after a successful prepare step. Do not add prepare-before-cleanup behavior unless the release process intentionally diverges from the Nutrino-style flow.
+
+## Release rollback
+
+Use the manual **Delete Release** workflow when a published release must be withdrawn. Provide the version without a leading `v` and confirm with `DELETE X.Y.Z`.
+
+Example:
+
+```text
+version: 0.2.0
+confirm: DELETE 0.2.0
+```
+
+The workflow deletes the GitHub Release and the matching tag. Prefer publishing a corrected patch release when users may already have downloaded the broken release.
+
+## App naming and onboarding
+
+The desktop apps are named `WinPassageAdmin` and `WinPassageClient` without spaces so installers, app directories, and artifacts remain predictable. Both apps may be installed on the same Windows computer.
+
+First-run setup must complete before the `driver.js` guide starts. Keep the guide short and focused on the next operational action.

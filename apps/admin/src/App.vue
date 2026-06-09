@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core';
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 import type {
   ActionResponse,
   ListSessionsResponse,
@@ -102,17 +104,20 @@ const canReset = computed(() => selectedUser.value.length > 0 && newPassword.val
 const canCreate = computed(() => createUsername.value.length > 0 && createPassword.value.length >= 12 && adminToken.value.length > 0);
 const canDelete = computed(() => selectedUser.value.length > 0 && deleteConfirmation.value === selectedUser.value && adminToken.value.length > 0);
 const canAddServer = computed(() => newServerName.value.trim().length > 0 && newServerHost.value.trim().length > 0 && Number(newServerPort.value) > 0);
-const isHostAdmin = computed(() => hostStatus.value?.is_windows === true && hostStatus.value?.is_elevated === true);
+const isHostAdmin = computed(() => hostStatus.value?.is_windows === true && hostStatus.value?.is_admin_account === true);
+const isElevated = computed(() => hostStatus.value?.is_elevated === true);
 const installServerUrl = computed(() => `http://${installBindHost.value}:${installPort.value}`);
 const canInstallServer = computed(
   () =>
-    isHostAdmin.value &&
+    isElevated.value &&
     installBindHost.value.trim().length > 0 &&
     Number(installPort.value) > 0 &&
     Number(installPort.value) <= 65535 &&
     installAdminToken.value.trim().length >= 16,
 );
-const canDemoteServer = computed(() => isHostAdmin.value && demoteConfirmation.value === 'DEMOTE SERVER');
+const canDemoteServer = computed(() => isElevated.value && demoteConfirmation.value === 'DEMOTE SERVER');
+const initialSetupOpen = ref(localStorage.getItem('winpassage.admin.initialSetupComplete') !== 'true');
+const tourCompleted = ref(localStorage.getItem('winpassage.admin.tourComplete') === 'true');
 
 async function loadHostStatus() {
   hostStatusLoading.value = true;
@@ -415,11 +420,86 @@ async function deleteUser() {
   });
 }
 
-onMounted(loadHostStatus);
+
+function saveInitialSetup() {
+  localStorage.setItem('winpassage.admin.initialSetupComplete', 'true');
+  initialSetupOpen.value = false;
+  void nextTick(() => startAdminTour());
+}
+
+function startAdminTour(force = false) {
+  if (!force && tourCompleted.value) return;
+
+  const tour = driver({
+    showProgress: true,
+    allowClose: true,
+    nextBtnText: 'Next',
+    prevBtnText: 'Back',
+    doneBtnText: 'Done',
+    steps: [
+      {
+        element: '#admin-server-install',
+        popover: {
+          title: 'Install the server',
+          description: 'Use this section only on the Windows Pro machine that should run the WinPassage service.',
+        },
+      },
+      {
+        element: '#admin-server-registry',
+        popover: {
+          title: 'Add servers by IP and port',
+          description: 'Each profile points to one standalone WinPassage server. Profiles do not copy users between machines.',
+        },
+      },
+      {
+        element: '#admin-users',
+        popover: {
+          title: 'Manage real Windows accounts',
+          description: 'Users and sessions are read from the selected server. WinPassage does not keep a separate user database.',
+        },
+      },
+    ],
+    onDestroyed: () => {
+      tourCompleted.value = true;
+      localStorage.setItem('winpassage.admin.tourComplete', 'true');
+    },
+  });
+
+  tour.drive();
+}
+
+onMounted(async () => {
+  await loadHostStatus();
+  if (!initialSetupOpen.value) {
+    void nextTick(() => startAdminTour());
+  }
+});
+
 </script>
 
 <template>
   <main class="app app-admin">
+    <section v-if="initialSetupOpen && isHostAdmin" class="setup-overlay" role="dialog" aria-modal="true">
+      <article class="setup-card">
+        <p class="eyebrow">First run</p>
+        <h1>Set the first admin connection.</h1>
+        <p class="lead">Confirm the local service port and admin token before the guide starts.</p>
+        <div class="grid two">
+          <label>
+            Server port
+            <input v-model.number="installPort" type="number" min="1" max="65535" />
+          </label>
+          <label>
+            Admin token
+            <input v-model="installAdminToken" type="password" autocomplete="new-password" placeholder="At least 16 characters" />
+          </label>
+        </div>
+        <div class="actions">
+          <button :disabled="installAdminToken.trim().length < 16" @click="saveInitialSetup">Save and show guide</button>
+          <button class="secondary" @click="initialSetupOpen = false; startAdminTour(true)">Skip setup</button>
+        </div>
+      </article>
+    </section>
     <section v-if="hostStatusLoading" class="lock-screen">
       <article class="lock-card">
         <div class="lock-icon">…</div>
@@ -438,7 +518,7 @@ onMounted(loadHostStatus);
         <ol class="step-list">
           <li class="step-item"><span class="step-number">1</span><span>Sign out from the standard Windows account.</span></li>
           <li class="step-item"><span class="step-number">2</span><span>Sign in with a local administrator account on this computer.</span></li>
-          <li class="step-item"><span class="step-number">3</span><span>Open WinPassage Admin again to install or manage the server service.</span></li>
+          <li class="step-item"><span class="step-number">3</span><span>Open WinPassageAdmin again. Use Run as administrator when installing or removing the service.</span></li>
         </ol>
         <div class="actions">
           <button class="secondary" @click="loadHostStatus">Check again</button>
@@ -447,9 +527,9 @@ onMounted(loadHostStatus);
     </section>
 
     <section v-else class="app-shell">
-      <aside class="side-rail" aria-label="WinPassage Admin navigation">
+      <aside class="side-rail" aria-label="WinPassageAdmin navigation">
         <div class="brand-block">
-          <div class="brand-mark">WP</div>
+          <div class="brand-mark" aria-hidden="true"><span class="bridge-icon">⊞</span></div>
           <div>
             <p class="brand-title">WinPassage</p>
             <p class="brand-subtitle">Admin console</p>
@@ -477,15 +557,15 @@ onMounted(loadHostStatus);
           <div class="hero-grid">
             <div>
               <p class="eyebrow">Windows Pro central machines</p>
-              <h1>Manage separate local networks from one trusted console.</h1>
+              <h1>Manage local Windows Pro servers.</h1>
               <p class="lead">
-                Register each central Windows Pro machine by IP address or DNS name, switch between networks, and manage the selected server's real local Windows accounts.
+                Add each server by IP and port. User operations always run on the selected Windows machine.
               </p>
             </div>
             <div class="status-stack">
-              <span class="status-pill success">Windows source of truth</span>
+              <span class="status-pill success">Windows accounts</span>
               <span class="status-pill warning">Per-server actions</span>
-              <span class="status-pill">EU small networks</span>
+              <span class="status-pill">Small networks</span>
             </div>
           </div>
         </header>
@@ -513,7 +593,7 @@ onMounted(loadHostStatus);
           </article>
         </section>
 
-        <section class="surface-card server-install-card">
+        <section id="admin-server-install" class="surface-card server-install-card">
           <div class="card-heading">
             <div>
               <h2>Make this computer a WinPassage server</h2>
@@ -522,7 +602,9 @@ onMounted(loadHostStatus);
             <span class="status-pill success">Administrator verified</span>
           </div>
 
-          <p class="notice warning">Place <strong>winpassage-server.exe</strong>, <strong>winpassage-agentctl.exe</strong>, and <strong>winpassage-updater.exe</strong> next to WinPassage Admin or choose their source folder before installing.</p>
+          <p v-if="!isElevated" class="notice warning">You are signed in with an administrator account, but this app is not elevated. Close it and choose <strong>Run as administrator</strong> before installing or removing the service.</p>
+
+          <p class="notice warning">Place <strong>winpassage-server.exe</strong>, <strong>winpassage-agentctl.exe</strong>, and <strong>winpassage-updater.exe</strong> next to WinPassageAdmin or choose their source folder before installing.</p>
 
           <div class="grid three">
             <label>
@@ -580,7 +662,7 @@ onMounted(loadHostStatus);
           </div>
         </section>
 
-        <section class="surface-card">
+        <section id="admin-server-registry" class="surface-card">
           <div class="card-heading">
             <div>
               <h2>Server registry</h2>
@@ -675,7 +757,7 @@ onMounted(loadHostStatus);
           <article class="surface-card">
             <div class="card-heading">
               <div>
-                <h2>Local users</h2>
+                <h2 id="admin-users">Local users</h2>
                 <p class="muted">The list is loaded from the selected server's local Windows accounts, not from a WinPassage database.</p>
               </div>
               <span class="status-pill">{{ selectedUser || 'No selection' }}</span>

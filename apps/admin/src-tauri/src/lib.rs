@@ -13,6 +13,7 @@ const SERVICE_BINARIES: [&str; 3] = [
 #[derive(Debug, Serialize)]
 struct AdminHostStatus {
     is_windows: bool,
+    is_admin_account: bool,
     is_elevated: bool,
     install_dir: String,
     executable_dir: Option<String>,
@@ -50,6 +51,7 @@ struct ServerInstallResult {
 #[tauri::command]
 fn get_admin_host_status() -> AdminHostStatus {
     let is_windows = cfg!(windows);
+    let is_admin_account = is_local_admin_account();
     let is_elevated = is_process_elevated();
     let executable_dir = std::env::current_exe()
         .ok()
@@ -58,14 +60,19 @@ fn get_admin_host_status() -> AdminHostStatus {
 
     let message = if !is_windows {
         "WinPassage server installation is available only on Windows.".to_string()
+    } else if !is_admin_account {
+        "This Windows account is not a local administrator. Sign in with a local administrator account to use WinPassageAdmin."
+            .to_string()
     } else if is_elevated {
-        "Administrator privileges detected. Server installation is available.".to_string()
+        "Local administrator account detected. Server installation is available.".to_string()
     } else {
-        "Administrator privileges are required. Sign out and open WinPassage Admin from an administrator account, or run it as administrator.".to_string()
+        "Local administrator account detected, but this process is not elevated. You can review settings, but installing or removing the service requires Run as administrator."
+            .to_string()
     };
 
     AdminHostStatus {
         is_windows,
+        is_admin_account,
         is_elevated,
         install_dir: INSTALL_DIR.to_string(),
         executable_dir,
@@ -104,7 +111,7 @@ fn install_server_mode(request: InstallServerRequest) -> Result<ServerInstallRes
         let target = install_dir.join(binary);
         if !source.exists() {
             return Err(format!(
-                "missing {binary} in {}. Place server, agentctl, and updater executables next to WinPassage Admin or choose the binary source directory.",
+                "missing {binary} in {}. Place server, agentctl, and updater executables next to WinPassageAdmin or choose the binary source directory.",
                 source_dir.display()
             ));
         }
@@ -192,11 +199,31 @@ fn demote_server_mode(request: DemoteServerRequest) -> Result<ServerInstallResul
 fn ensure_elevated() -> Result<(), String> {
     if cfg!(windows) && !is_process_elevated() {
         return Err(
-            "Administrator privileges are required. Reopen WinPassage Admin from an administrator account.".to_string(),
+            "Elevation is required. Close WinPassageAdmin and reopen it with Run as administrator."
+                .to_string(),
         );
     }
 
     Ok(())
+}
+
+fn is_local_admin_account() -> bool {
+    #[cfg(windows)]
+    {
+        Command::new("whoami")
+            .args(["/groups"])
+            .output()
+            .map(|output| {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                output.status.success() && stdout.contains("S-1-5-32-544")
+            })
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(windows))]
+    {
+        true
+    }
 }
 
 fn is_process_elevated() -> bool {
@@ -268,5 +295,5 @@ pub fn run() {
             demote_server_mode
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run WinPassage Admin");
+        .expect("failed to run WinPassageAdmin");
 }
