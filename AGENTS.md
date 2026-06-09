@@ -424,5 +424,5 @@ Use the Verzly release tools the same way the working release templates do: inst
 - Validate every URL before downloading or applying an update.
 - Do not make Tauri apps replace privileged service binaries directly. Use the updater/service-control boundary.
 - If release tooling changes, keep the workflow aligned with the Nutrino/toolchain pattern and the actual CLI contracts.
-- For `cargo-release`, use `build --config <file> --version <version> --target windows-x64`; do not add unsupported `--output`, `--windows-x64`, or `--verbose` flags.
-- For `tauri-release`, use `build --config <file> --platform windows`; do not add unsupported `--output`, `--windows`, or `--verbose` flags.
+- For `cargo-release`, use `build --config <file>`; do not add unsupported `--output`, `--windows-x64`, `--target`, `--version`, or `--verbose` flags unless the checked-in CLI contract explicitly documents them.
+- For `tauri-release`, use `build --config <file>` and put output paths/platform selection in the TOML config; do not add unsupported `--output`, `--windows`, or `--verbose` flags.

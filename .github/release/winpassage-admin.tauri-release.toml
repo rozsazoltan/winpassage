@@ -1,37 +1,50 @@
 [project]
-project_dir = "apps/admin"
-package_manager = "aube"
-install_command = "aube install"
+root = "."
+frontend_install = "aube install"
 
-[output]
-clean = true
-sha256 = true
-manifest = true
+[build]
+out_dir = "dist/release/winpassage-admin"
+cache_dir = ".cache/tauri-release/winpassage-admin"
+default_strategy = "host"
+container_engine = "podman"
 
 [artifacts]
-include_extensions = ["exe", "msi", "zip", "sig"]
-include_files = ["latest.json", "release.json", "release-manifest.json"]
-keep_relative_paths = false
-allow_empty = false
+checksum = true
+manifest = true
 
-[linux]
-enabled = false
-strategy = "disabled"
-
-[windows]
+[platforms.windows]
 enabled = true
-strategy = "host-only"
-bundles = ["nsis", "msi"]
-targets = ["x86_64-pc-windows-msvc"]
+strategy = "host"
+command = "aube run tauri:build --filter winpassage-admin"
+artifacts = [
+  ".cache/rust/packages/winpassage/target/release/bundle/**/*.msi",
+  ".cache/rust/packages/winpassage/target/release/bundle/**/*.exe",
+  ".cache/rust/packages/winpassage/target/release/bundle/**/*.zip",
+  "apps/admin/src-tauri/target/release/bundle/**/*.msi",
+  "apps/admin/src-tauri/target/release/bundle/**/*.exe",
+  "apps/admin/src-tauri/target/release/bundle/**/*.zip",
+]
 
-[macos]
+[platforms.linux]
 enabled = false
-strategy = "disabled"
+strategy = "host"
+command = "aube run tauri:build --filter winpassage-admin"
+artifacts = []
 
-[android]
+[platforms.macos]
 enabled = false
-strategy = "disabled"
+strategy = "host"
+command = "aube run tauri:build --filter winpassage-admin"
+artifacts = []
 
-[ios]
+[platforms.android]
 enabled = false
-strategy = "disabled"
+strategy = "host"
+command = "aube run tauri:build --filter winpassage-admin"
+artifacts = []
+
+[platforms.ios]
+enabled = false
+strategy = "host"
+command = "aube run tauri:build --filter winpassage-admin"
+artifacts = []
