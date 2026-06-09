@@ -48,6 +48,12 @@ jobs:
         with:
           install-only: true
 
+      - name: Configure Git author
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Prepare release branch
         id: prepare
         shell: bash
@@ -217,6 +223,12 @@ jobs:
         uses: verzly/github-release@v0
         with:
           install-only: true
+
+      - name: Configure Git author
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Finalize release
         shell: bash

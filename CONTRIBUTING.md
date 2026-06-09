@@ -211,6 +211,13 @@ Use the published Verzly action line:
 
 Only update major action refs when the matching distribution repository has the new major tag.
 
+Release jobs that create commits, tags, or merge release branches must configure the local Git author before running `github-release prepare` or `github-release finalize`:
+
+```bash
+git config user.name "github-actions[bot]"
+git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+```
+
 ## Release workflow
 
 The release workflow is Windows-only for app artifacts.
