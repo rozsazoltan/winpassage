@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+use std::net::SocketAddr;
 
 #[derive(Debug, Parser)]
 #[command(name = "winpassage-server")]
@@ -11,8 +12,18 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Run as a foreground HTTP server.
-    Serve,
+    Serve(ServerOptions),
 
     /// Run under Windows Service Control Manager.
-    Service,
+    Service(ServerOptions),
+}
+
+#[derive(Debug, Clone, Default, Args)]
+pub struct ServerOptions {
+    #[arg(long)]
+    pub bind: Option<SocketAddr>,
+    #[arg(long)]
+    pub admin_token: Option<String>,
+    #[arg(long, value_parser = clap::builder::BoolishValueParser::new())]
+    pub require_tls: Option<bool>,
 }

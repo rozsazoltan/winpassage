@@ -1,8 +1,11 @@
 #[cfg(windows)]
+use crate::cli::ServerOptions;
+#[cfg(windows)]
 use anyhow::Result;
-
 #[cfg(windows)]
 use std::ffi::OsString;
+#[cfg(windows)]
+use std::sync::OnceLock;
 #[cfg(windows)]
 use std::time::Duration;
 #[cfg(windows)]
@@ -22,10 +25,14 @@ use windows_service::service_dispatcher;
 const SERVICE_NAME: &str = "WinPassage";
 
 #[cfg(windows)]
+static SERVICE_OPTIONS: OnceLock<ServerOptions> = OnceLock::new();
+
+#[cfg(windows)]
 define_windows_service!(ffi_service_main, service_main);
 
 #[cfg(windows)]
-pub fn run_service_dispatcher() -> Result<()> {
+pub fn run_service_dispatcher(options: ServerOptions) -> Result<()> {
+    let _ = SERVICE_OPTIONS.set(options);
     service_dispatcher::start(SERVICE_NAME, ffi_service_main)?;
     Ok(())
 }
@@ -42,21 +49,19 @@ fn run_service() -> Result<()> {
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let shutdown_tx = std::sync::Mutex::new(Some(shutdown_tx));
 
-    let status_handle =
-        service_control_handler::register(
-            SERVICE_NAME,
-            move |control_event| match control_event {
-                ServiceControl::Stop => {
-                    if let Some(sender) = shutdown_tx.lock().ok().and_then(|mut guard| guard.take())
-                    {
-                        let _ = sender.send(());
-                    }
-                    ServiceControlHandlerResult::NoError
+    let status_handle = service_control_handler::register(
+        SERVICE_NAME,
+        move |control_event| match control_event {
+            ServiceControl::Stop => {
+                if let Some(sender) = shutdown_tx.lock().ok().and_then(|mut guard| guard.take()) {
+                    let _ = sender.send(());
                 }
-                ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-                _ => ServiceControlHandlerResult::NotImplemented,
-            },
-        )?;
+                ServiceControlHandlerResult::NoError
+            }
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+            _ => ServiceControlHandlerResult::NotImplemented,
+        },
+    )?;
 
     status_handle.set_service_status(ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
@@ -78,9 +83,14 @@ fn run_service() -> Result<()> {
         process_id: None,
     })?;
 
+    let options = SERVICE_OPTIONS.get().cloned().unwrap_or_default();
     let runtime = tokio::runtime::Runtime::new()?;
-    let result = runtime.block_on(async {
-        let config = crate::config::ServerConfig::from_env()?;
+    let result = runtime.block_on(async move {
+        let config = crate::config::ServerConfig::from_env_with_overrides(
+            options.bind,
+            options.admin_token,
+            options.require_tls,
+        )?;
         crate::http::serve_with_shutdown(config, shutdown_rx).await
     });
 

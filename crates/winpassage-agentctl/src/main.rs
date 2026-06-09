@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -19,6 +20,12 @@ enum AgentCommand {
     Install {
         #[arg(long)]
         server_bin: PathBuf,
+        #[arg(long, default_value = "0.0.0.0:4487")]
+        bind: SocketAddr,
+        #[arg(long)]
+        admin_token: String,
+        #[arg(long, default_value = "false")]
+        require_tls: String,
     },
     Uninstall,
     Start,
@@ -30,7 +37,12 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        AgentCommand::Install { server_bin } => install(server_bin),
+        AgentCommand::Install {
+            server_bin,
+            bind,
+            admin_token,
+            require_tls,
+        } => install(server_bin, bind, admin_token, require_tls),
         AgentCommand::Uninstall => sc(&["delete", SERVICE_NAME]),
         AgentCommand::Start => sc(&["start", SERVICE_NAME]),
         AgentCommand::Stop => sc(&["stop", SERVICE_NAME]),
@@ -38,16 +50,33 @@ fn main() -> Result<()> {
     }
 }
 
-fn install(server_bin: PathBuf) -> Result<()> {
+fn install(
+    server_bin: PathBuf,
+    bind: SocketAddr,
+    admin_token: String,
+    require_tls: String,
+) -> Result<()> {
     if !cfg!(windows) {
         bail!("WinPassage service install is available only on Windows");
     }
+
+    if admin_token.trim().is_empty() {
+        bail!("--admin-token is required when installing the WinPassage service");
+    }
+
+    let require_tls = matches!(require_tls.as_str(), "1" | "true" | "TRUE" | "True");
 
     let server_bin = server_bin
         .canonicalize()
         .with_context(|| format!("server binary does not exist: {server_bin:?}"))?;
 
-    let bin_path = format!(r#""{}" service"#, server_bin.display());
+    let bin_path = format!(
+        r#""{}" service --bind "{}" --admin-token "{}" --require-tls {}"#,
+        server_bin.display(),
+        bind,
+        admin_token.trim(),
+        require_tls
+    );
 
     sc(&[
         "create",
