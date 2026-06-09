@@ -40,3 +40,35 @@ mod tests {
         assert!(validate_local_username("domain\\julia").is_err());
     }
 }
+
+#[cfg(test)]
+mod strict_tests {
+    use super::validate_local_username;
+    use crate::CoreError;
+
+    #[test]
+    fn accepts_usernames_with_common_safe_separators() {
+        assert!(validate_local_username("julia.nagy").is_ok());
+        assert!(validate_local_username("julia-nagy").is_ok());
+        assert!(validate_local_username("julia_nagy").is_ok());
+    }
+
+    #[test]
+    fn rejects_each_unsupported_character() {
+        for ch in ['/', '\\', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '"'] {
+            let username = format!("julia{ch}nagy");
+            assert!(matches!(
+                validate_local_username(&username),
+                Err(CoreError::UsernameContainsUnsupportedCharacters)
+            ));
+        }
+    }
+
+    #[test]
+    fn rejects_control_characters() {
+        assert!(matches!(
+            validate_local_username("julia\nnagy"),
+            Err(CoreError::UsernameContainsUnsupportedCharacters)
+        ));
+    }
+}

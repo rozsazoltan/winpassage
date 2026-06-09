@@ -294,14 +294,27 @@ Shell/automation:
 
 ## Testing expectations
 
-Before finishing a change, run the relevant checks when the local environment supports them:
+Before finishing a change, run the strict gates when the local environment supports them:
 
 ```bash
-aube run fmt:rust:check
-aube run lint:rust
-aube run test:rust
+aube run check:rust
 aube run check:js
 ```
+
+Rust changes should stay covered by all of these checks:
+
+- formatting with `cargo fmt --all -- --check`;
+- compilation with `cargo check --workspace --all-targets`;
+- lints with `cargo clippy --workspace --all-targets -- -D warnings`;
+- unit and non-destructive integration tests with `cargo test --workspace --all-targets`;
+- documentation tests with `cargo test --workspace --doc`;
+- rustdoc warning checks with `RUSTDOCFLAGS=-D warnings cargo doc --workspace --no-deps`.
+
+Frontend changes should stay covered by:
+
+- `vue-tsc --noEmit` for admin and client;
+- `vitest run` for admin and client;
+- production `vite build` for admin and client.
 
 Windows-specific behavior should be verified on Windows 11 Pro when possible:
 
@@ -311,6 +324,8 @@ Windows-specific behavior should be verified on Windows 11 Pro when possible:
 - service install/start/stop;
 - mapped drive reconnect;
 - Credential Manager updates.
+
+Destructive account lifecycle tests must remain ignored by default. They may create, modify, grant/revoke admin rights for, and delete a disposable local Windows account only when the dedicated `Windows Destructive Validation` workflow or an explicit local environment variable enables them. Never make destructive tests run on every pull request.
 
 If a tool is unavailable in the current environment, state what was and was not verified.
 

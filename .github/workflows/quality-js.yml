@@ -26,6 +26,14 @@ jobs:
         with:
           run_install: true
 
-      - name: Build frontends
+      - name: Typecheck frontends
         shell: bash
-        run: aube run check:js
+        run: aube run typecheck:js
+
+      - name: Unit tests
+        shell: bash
+        run: aube run test:js
+
+      - name: Production builds
+        shell: bash
+        run: aube run build:js

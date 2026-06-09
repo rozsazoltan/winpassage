@@ -10,5 +10,6 @@ catalog:
   vite: ^7.0.0
   vue: ^3.5.0
   vue-tsc: ^3.0.0
+  vitest: ^3.2.0
 
 verifyDepsBeforeRun: install

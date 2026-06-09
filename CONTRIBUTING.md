@@ -160,16 +160,35 @@ Development expectations:
 
 ## Testing
 
-Run touched-area checks before opening a pull request:
+Run the strict local quality gate before opening or updating a pull request:
 
 ```bash
-aube run fmt:rust:check
-aube run lint:rust
-aube run test:rust
+aube run check:rust
 aube run check:js
 ```
 
-Windows-specific code should be tested on Windows 11 Pro because local user, service control, and mapped drive APIs cannot be fully validated on Linux CI.
+The Rust gate is intentionally broad:
+
+```text
+cargo fmt --all -- --check
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --all-targets
+cargo test --workspace --doc
+cargo doc --workspace --no-deps with RUSTDOCFLAGS=-D warnings in CI
+```
+
+The frontend gate is also split into separate failures so CI shows the real cause:
+
+```text
+vue-tsc --noEmit for admin and client
+vitest run for admin and client
+vite build for admin and client
+```
+
+Windows-specific code must be validated on Windows 11 Pro because local user, service control, session, and mapped drive APIs cannot be fully proven on Linux CI.
+
+Non-destructive Windows observability tests run with the normal Rust test suite. Destructive account lifecycle tests are ignored by default and are available through the `Windows Destructive Validation` GitHub Actions workflow. That workflow creates, modifies, grants/revokes administrator membership for, and deletes a disposable local test account on the runner. Run it only on disposable CI runners or test machines.
 
 ## GitHub Actions
 

@@ -43,3 +43,25 @@ impl AuditEvent {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AuditEvent, AuditResult};
+    use uuid::Uuid;
+
+    #[test]
+    fn audit_event_serializes_without_password_fields() {
+        let event = AuditEvent::new(
+            "admin_password_reset",
+            "admin",
+            "julia",
+            AuditResult::Success,
+            Uuid::nil(),
+        );
+
+        let json = serde_json::to_string(&event).expect("audit event should serialize");
+        assert!(json.contains("admin_password_reset"));
+        assert!(!json.to_ascii_lowercase().contains("password\":"));
+        assert!(!json.contains("secret"));
+    }
+}

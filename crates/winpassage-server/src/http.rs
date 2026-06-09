@@ -583,3 +583,38 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::validate_transport;
+    use crate::config::ServerConfig;
+    use std::path::PathBuf;
+
+    fn config(bind: &str, require_tls: bool) -> ServerConfig {
+        ServerConfig {
+            bind: bind.parse().expect("test bind should parse"),
+            admin_token: None,
+            require_tls,
+            audit_log: PathBuf::from("audit.jsonl"),
+            password_min_length: 12,
+        }
+    }
+
+    #[test]
+    fn allows_loopback_http_when_tls_required() {
+        assert!(validate_transport(&config("127.0.0.1:4487", true)).is_ok());
+    }
+
+    #[test]
+    fn rejects_lan_http_when_tls_required() {
+        let error = validate_transport(&config("0.0.0.0:4487", true))
+            .expect_err("non-loopback plain HTTP must be rejected by default");
+
+        assert!(error.to_string().contains("WINPASSAGE_REQUIRE_TLS=true"));
+    }
+
+    #[test]
+    fn allows_lan_http_only_when_operator_explicitly_disables_tls_requirement() {
+        assert!(validate_transport(&config("0.0.0.0:4487", false)).is_ok());
+    }
+}

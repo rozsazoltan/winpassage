@@ -74,3 +74,47 @@ mod tests {
         assert!(PasswordPolicy::default().validate("Aa1!").is_err());
     }
 }
+
+#[cfg(test)]
+mod strict_tests {
+    use super::PasswordPolicy;
+    use crate::CoreError;
+
+    #[test]
+    fn rejects_password_without_uppercase() {
+        let result = PasswordPolicy::default().validate("longpassword123!");
+        assert!(matches!(result, Err(CoreError::PasswordMissingUppercase)));
+    }
+
+    #[test]
+    fn rejects_password_without_lowercase() {
+        let result = PasswordPolicy::default().validate("LONGPASSWORD123!");
+        assert!(matches!(result, Err(CoreError::PasswordMissingLowercase)));
+    }
+
+    #[test]
+    fn rejects_password_without_number() {
+        let result = PasswordPolicy::default().validate("LongPassword!!!");
+        assert!(matches!(result, Err(CoreError::PasswordMissingNumber)));
+    }
+
+    #[test]
+    fn rejects_password_without_symbol() {
+        let result = PasswordPolicy::default().validate("LongPassword123");
+        assert!(matches!(result, Err(CoreError::PasswordMissingSymbol)));
+    }
+
+    #[test]
+    fn supports_operator_defined_minimum_length() {
+        let policy = PasswordPolicy {
+            min_length: 16,
+            ..PasswordPolicy::default()
+        };
+
+        assert!(matches!(
+            policy.validate("LongPass123!"),
+            Err(CoreError::PasswordTooShort { min: 16 })
+        ));
+        assert!(policy.validate("VeryLongPassword123!").is_ok());
+    }
+}
