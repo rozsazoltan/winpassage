@@ -24,6 +24,7 @@ aube install
 ```
 
 The repository assumes Rust stable, Node.js 24, aube, and the Verzly release toolchain in local development or GitHub Actions.
+All GitHub Actions workflows that run frontend or Tauri JavaScript steps must use the shared `NODE_VERSION: "24"` setting. Workflows should also set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` and use Node.js 24-compatible action versions such as `actions/cache@v5`.
 
 ## Workspace rules
 
@@ -121,7 +122,7 @@ $env:WINPASSAGE_AUDIT_LOG = "C:\ProgramData\WinPassage\audit.jsonl"
 
 Rust Quality uses a single `rust-cache run` wrapper around the full strict Rust command sequence. The workflow runs on `windows-latest`, so the wrapper must execute the cargo sequence through PowerShell/`pwsh`, not `bash -lc`. Calling `bash` from inside `rust-cache run` can resolve to WSL on GitHub-hosted Windows runners and fail when no WSL distribution is installed.
 
-Keep the `.cache` target directory shared across the check, clippy, test, doctest, and rustdoc phases inside the same job. Do not split the Rust quality workflow back into several independent `rust-cache run` steps unless the cache toolchain contract changes or there is measured evidence that separate steps are faster.
+Keep the `.cache` target directory shared across the check, clippy, test, doctest, and rustdoc phases inside the same job. Do not split the Rust quality workflow back into several independent `rust-cache run` steps unless the cache toolchain contract changes or there is measured evidence that separate steps are faster. Use `actions/cache@v5` for GitHub-hosted cache restore/save so the cache action itself runs on the Node.js 24 runtime.
 
 ## Release workflow
 

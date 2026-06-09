@@ -444,7 +444,7 @@ Keep the PR Rust Quality workflow cache-friendly and Windows-native. The workflo
 
 ## CI cache guidance for AI agents
 
-The `.cache` directory is not persistent by itself on GitHub-hosted runners. Keep `actions/cache` around the Rust workflows so Cargo registry, Cargo git checkout data, and the shared `.cache/rust` target directory survive across workflow runs.
+The `.cache` directory is not persistent by itself on GitHub-hosted runners. Keep `actions/cache@v5` around the Rust workflows so Cargo registry, Cargo git checkout data, and the shared `.cache/rust` target directory survive across workflow runs. Do not downgrade cache steps to `actions/cache@v4`, because that reintroduces Node.js 20 runtime warnings on current GitHub Actions runners.
 
 Use cache keys that include `Cargo.lock` when it exists and fall back to `**/Cargo.toml` plus `rust-cache.toml` while the lockfile is not yet committed. Do not assume `Cargo.lock` exists in this repository until it is checked in.
 
@@ -452,3 +452,7 @@ For this application-style workspace, prefer committing `Cargo.lock` once it can
 
 Do not replace Windows Rust workflow commands with `bash -lc` inside `rust-cache run`; use Windows-native `pwsh` when grouping commands on Windows runners.
 
+
+## Node and aube workflow rules
+
+Use Node.js 24 for every GitHub Actions job that runs aube, frontend checks, or Tauri JavaScript build steps. Prefer a workflow-level `NODE_VERSION: "24"` environment variable and reference it from `actions/setup-node`. Set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` at workflow level, and keep first-party cache usage on `actions/cache@v5` or newer. Do not reintroduce pnpm, npm install, Node version drift, or Node.js 20-based action versions into CI.

@@ -21,6 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: "24"
   RELEASE_ARTIFACT_DIR: dist/release-artifacts
   RELEASE_UPLOAD_DIR: dist/release-upload
@@ -120,7 +121,7 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
       - name: Restore Rust dependency cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .cache/rust
@@ -197,7 +198,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Restore aube cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .cache/js
@@ -224,7 +225,7 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
       - name: Restore Rust dependency cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .cache/rust

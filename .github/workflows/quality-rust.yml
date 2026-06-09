@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   rust:
     name: Rust strict quality
@@ -26,7 +29,7 @@ jobs:
           cargo --version
 
       - name: Restore Rust dependency cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .cache/rust
@@ -38,7 +41,7 @@ jobs:
             rust-${{ runner.os }}-
 
       - name: Install rust-cache
-        uses: verzly/rust-cache@v0
+        uses: verzly/rust-cache@latest
         with:
           install-only: true
 
