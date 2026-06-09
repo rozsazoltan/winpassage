@@ -6,7 +6,7 @@ mod imp {
     use super::*;
     use anyhow::{anyhow, bail};
     use std::ffi::c_void;
-    use std::ptr::{null, null_mut};
+    use std::ptr::null_mut;
 
     const WTS_CURRENT_SERVER_HANDLE: *mut c_void = null_mut();
     const WTS_USER_NAME: u32 = 5;

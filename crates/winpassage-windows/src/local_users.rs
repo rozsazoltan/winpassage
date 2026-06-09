@@ -4,7 +4,7 @@ use winpassage_protocol::LocalUserSummary;
 #[cfg(windows)]
 mod imp {
     use super::*;
-    use anyhow::{anyhow, bail, Context};
+    use anyhow::{anyhow, bail};
     use std::ffi::c_void;
     use std::ffi::OsStr;
     use std::iter::once;
@@ -193,7 +193,7 @@ mod imp {
             }
         }
 
-        users.sort_by(|a, b| a.username.to_lowercase().cmp(&b.username.to_lowercase()));
+        users.sort_by_key(|user| user.username.to_lowercase());
         Ok(users)
     }
 

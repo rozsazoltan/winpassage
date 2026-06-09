@@ -8,7 +8,7 @@ mod imp {
     use std::ffi::OsStr;
     use std::iter::once;
     use std::os::windows::ffi::OsStrExt;
-    use std::ptr::{null, null_mut};
+    use std::ptr::null_mut;
     use zeroize::Zeroize;
 
     const NO_ERROR: u32 = 0;
