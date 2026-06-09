@@ -24,7 +24,7 @@ aube install
 ```
 
 The repository assumes Rust stable, Node.js 24, aube, and the Verzly release toolchain in local development or GitHub Actions.
-All GitHub Actions workflows that run frontend or Tauri JavaScript steps must use the shared `NODE_VERSION: "24"` setting. Workflows should also set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` and use Node.js 24-compatible action versions such as `actions/cache@v5`.
+All GitHub Actions workflows that run frontend or Tauri JavaScript steps must use the shared `NODE_VERSION: "24"` setting. Workflows should also set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` and use Node.js 24-compatible action versions such as `actions/cache@v5`. Cache only the aube content-addressable store/cache directories under `.cache/aube`; do not cache `node_modules` or `node_modules/.aube` on Windows runners.
 
 ## Workspace rules
 
