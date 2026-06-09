@@ -87,7 +87,10 @@ mod tests {
             ("WINPASSAGE_BIND", "0.0.0.0:4487"),
             ("WINPASSAGE_ADMIN_TOKEN", "dev-token"),
             ("WINPASSAGE_REQUIRE_TLS", "false"),
-            ("WINPASSAGE_AUDIT_LOG", "C:/ProgramData/WinPassage/audit.jsonl"),
+            (
+                "WINPASSAGE_AUDIT_LOG",
+                "C:/ProgramData/WinPassage/audit.jsonl",
+            ),
             ("WINPASSAGE_PASSWORD_MIN_LENGTH", "16"),
         ]);
 
@@ -104,10 +107,9 @@ mod tests {
     #[test]
     fn rejects_invalid_bind_address() {
         let values: HashMap<&str, &str> = [("WINPASSAGE_BIND", "not-a-socket")].into();
-        let error = ServerConfig::from_values(|key| {
-            values.get(key).map(|value| (*value).to_string())
-        })
-        .expect_err("invalid bind address should fail");
+        let error =
+            ServerConfig::from_values(|key| values.get(key).map(|value| (*value).to_string()))
+                .expect_err("invalid bind address should fail");
 
         assert!(error.to_string().contains("invalid WINPASSAGE_BIND"));
     }

@@ -55,7 +55,9 @@ mod strict_tests {
 
     #[test]
     fn rejects_each_unsupported_character() {
-        for ch in ['/', '\\', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '"'] {
+        for ch in [
+            '/', '\\', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '"',
+        ] {
             let username = format!("julia{ch}nagy");
             assert!(matches!(
                 validate_local_username(&username),

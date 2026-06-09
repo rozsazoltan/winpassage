@@ -45,7 +45,9 @@ fn local_account_lifecycle_works_on_windows() {
     .expect("test user should be created");
 
     let users = winpassage_windows::list_local_users().expect("users should be listed");
-    assert!(users.iter().any(|user| user.username.eq_ignore_ascii_case(&username)));
+    assert!(users
+        .iter()
+        .any(|user| user.username.eq_ignore_ascii_case(&username)));
 
     winpassage_windows::set_local_user_enabled(&username, false)
         .expect("test user should be disabled");
@@ -59,31 +61,35 @@ fn local_account_lifecycle_works_on_windows() {
 
     winpassage_windows::grant_local_administrator(&username)
         .expect("test user should be grantable as administrator");
-    assert!(
-        winpassage_windows::is_local_administrator(&username)
-            .expect("administrator membership should be queryable")
-    );
+    assert!(winpassage_windows::is_local_administrator(&username)
+        .expect("administrator membership should be queryable"));
     winpassage_windows::revoke_local_administrator(&username)
         .expect("test user administrator membership should be revokable");
-    assert!(
-        !winpassage_windows::is_local_administrator(&username)
-            .expect("administrator membership should be queryable after revoke")
-    );
+    assert!(!winpassage_windows::is_local_administrator(&username)
+        .expect("administrator membership should be queryable after revoke"));
 
     winpassage_windows::delete_local_user(&username).expect("test user should be deleted");
 
-    let users = winpassage_windows::list_local_users()
-        .expect("users should be listed after delete");
-    assert!(!users.iter().any(|user| user.username.eq_ignore_ascii_case(&username)));
+    let users =
+        winpassage_windows::list_local_users().expect("users should be listed after delete");
+    assert!(!users
+        .iter()
+        .any(|user| user.username.eq_ignore_ascii_case(&username)));
 }
 
 #[test]
 fn non_destructive_windows_observability_works() {
     let users = winpassage_windows::list_local_users().expect("local users should be listable");
-    assert!(!users.is_empty(), "a Windows machine should have at least one local user account");
+    assert!(
+        !users.is_empty(),
+        "a Windows machine should have at least one local user account"
+    );
 
     let _sessions = winpassage_windows::list_sessions().expect("sessions should be listable");
     let admin_count = winpassage_windows::local_administrator_count()
         .expect("local administrator membership should be countable");
-    assert!(admin_count >= 1, "there should be at least one local administrator");
+    assert!(
+        admin_count >= 1,
+        "there should be at least one local administrator"
+    );
 }
