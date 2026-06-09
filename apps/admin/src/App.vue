@@ -401,7 +401,7 @@ async function demoteServer() {
     const payload = await invoke<ServerInstallResult>('demote_server_mode', {
       request: {
         install_dir: installDir.value || null,
-        confirmation: 'DEMOTE SERVER',
+        confirmation: 'REMOVE SERVER',
         remove_files: demoteRemoveFiles.value,
       },
     });

@@ -46,6 +46,7 @@ export interface AdminHostStatus {
   is_windows: boolean;
   is_admin_account: boolean;
   is_elevated: boolean;
+  service_installed: boolean;
   install_dir: string;
   executable_dir: string | null;
   message: string;
