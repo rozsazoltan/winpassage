@@ -7,9 +7,14 @@ pub fn validate_local_username(username: &str) -> CoreResult<()> {
         return Err(CoreError::UsernameRequired);
     }
 
-    let unsupported = ['/', '\\', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '"'];
+    let unsupported = [
+        '/', '\\', '[', ']', ':', ';', '|', '=', ',', '+', '*', '?', '<', '>', '"',
+    ];
 
-    if trimmed.chars().any(|ch| unsupported.contains(&ch) || ch.is_control()) {
+    if trimmed
+        .chars()
+        .any(|ch| unsupported.contains(&ch) || ch.is_control())
+    {
         return Err(CoreError::UsernameContainsUnsupportedCharacters);
     }
 

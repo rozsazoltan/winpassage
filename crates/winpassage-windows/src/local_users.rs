@@ -65,12 +65,7 @@ mod imp {
             bufptr: *mut *mut u8,
         ) -> u32;
 
-        fn NetUserAdd(
-            servername: *const u16,
-            level: u32,
-            buf: *mut u8,
-            parm_err: *mut u32,
-        ) -> u32;
+        fn NetUserAdd(servername: *const u16, level: u32, buf: *mut u8, parm_err: *mut u32) -> u32;
 
         fn NetUserDel(servername: *const u16, username: *const u16) -> u32;
 
@@ -118,7 +113,9 @@ mod imp {
             len += 1;
         }
 
-        Some(String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len)))
+        Some(String::from_utf16_lossy(std::slice::from_raw_parts(
+            ptr, len,
+        )))
     }
 
     fn net_error(context: &str, code: u32) -> anyhow::Error {
@@ -326,7 +323,11 @@ mod imp {
         Ok(())
     }
 
-    pub fn change_own_password(username: &str, current_password: &str, new_password: &str) -> Result<()> {
+    pub fn change_own_password(
+        username: &str,
+        current_password: &str,
+        new_password: &str,
+    ) -> Result<()> {
         let username_wide = to_wide(username);
         let mut current_password_wide = to_wide(current_password);
         let mut new_password_wide = to_wide(new_password);
@@ -382,7 +383,11 @@ mod imp {
         bail!("local Windows password reset is available only on Windows")
     }
 
-    pub fn change_own_password(_username: &str, _current_password: &str, _new_password: &str) -> Result<()> {
+    pub fn change_own_password(
+        _username: &str,
+        _current_password: &str,
+        _new_password: &str,
+    ) -> Result<()> {
         bail!("local Windows password change is available only on Windows")
     }
 }
@@ -413,6 +418,10 @@ pub fn reset_local_user_password(username: &str, new_password: &str) -> Result<(
     imp::reset_local_user_password(username, new_password)
 }
 
-pub fn change_own_password(username: &str, current_password: &str, new_password: &str) -> Result<()> {
+pub fn change_own_password(
+    username: &str,
+    current_password: &str,
+    new_password: &str,
+) -> Result<()> {
     imp::change_own_password(username, current_password, new_password)
 }

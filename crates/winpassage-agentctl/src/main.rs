@@ -60,7 +60,11 @@ fn install(server_bin: PathBuf) -> Result<()> {
         DISPLAY_NAME,
     ])?;
 
-    sc(&["description", SERVICE_NAME, "Local Windows password self-service agent"])?;
+    sc(&[
+        "description",
+        SERVICE_NAME,
+        "Local Windows password self-service agent",
+    ])?;
 
     Ok(())
 }

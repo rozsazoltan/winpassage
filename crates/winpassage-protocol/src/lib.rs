@@ -18,7 +18,6 @@ pub struct ServerEndpointProfile {
     pub notes: Option<String>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalUserSummary {
     pub username: String,

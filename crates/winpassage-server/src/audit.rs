@@ -32,7 +32,8 @@ impl AuditWriter {
 
 fn append_event(path: &PathBuf, event: &AuditEvent) -> Result<()> {
     if let Some(parent) = path.parent() {
-        create_dir_all(parent).with_context(|| format!("failed to create audit log directory {parent:?}"))?;
+        create_dir_all(parent)
+            .with_context(|| format!("failed to create audit log directory {parent:?}"))?;
     }
 
     let mut file = OpenOptions::new()

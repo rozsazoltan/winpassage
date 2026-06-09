@@ -21,8 +21,10 @@ pub fn list_local_users() -> Result<Vec<LocalUserSummary>> {
     let mut users = local_users::list_local_users_base()?;
 
     for user in &mut users {
-        user.is_administrator = local_groups::is_local_administrator(&user.username).unwrap_or(false);
-        user.active_session_count = sessions::active_session_count_for_user(&user.username).unwrap_or(0);
+        user.is_administrator =
+            local_groups::is_local_administrator(&user.username).unwrap_or(false);
+        user.active_session_count =
+            sessions::active_session_count_for_user(&user.username).unwrap_or(0);
     }
 
     Ok(users)

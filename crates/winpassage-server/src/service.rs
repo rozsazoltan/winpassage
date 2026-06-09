@@ -42,18 +42,21 @@ fn run_service() -> Result<()> {
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let shutdown_tx = std::sync::Mutex::new(Some(shutdown_tx));
 
-    let status_handle = service_control_handler::register(SERVICE_NAME, move |control_event| {
-        match control_event {
-            ServiceControl::Stop => {
-                if let Some(sender) = shutdown_tx.lock().ok().and_then(|mut guard| guard.take()) {
-                    let _ = sender.send(());
+    let status_handle =
+        service_control_handler::register(
+            SERVICE_NAME,
+            move |control_event| match control_event {
+                ServiceControl::Stop => {
+                    if let Some(sender) = shutdown_tx.lock().ok().and_then(|mut guard| guard.take())
+                    {
+                        let _ = sender.send(());
+                    }
+                    ServiceControlHandlerResult::NoError
                 }
-                ServiceControlHandlerResult::NoError
-            }
-            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-            _ => ServiceControlHandlerResult::NotImplemented,
-        }
-    })?;
+                ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+                _ => ServiceControlHandlerResult::NotImplemented,
+            },
+        )?;
 
     status_handle.set_service_status(ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,

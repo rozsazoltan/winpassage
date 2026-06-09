@@ -67,7 +67,9 @@ mod imp {
             return None;
         }
 
-        Some(String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len)))
+        Some(String::from_utf16_lossy(std::slice::from_raw_parts(
+            ptr, len,
+        )))
     }
 
     fn query_string(session_id: u32, info_class: u32) -> Result<Option<String>> {
@@ -150,8 +152,18 @@ mod imp {
     pub fn active_session_count_for_user(username: &str) -> Result<usize> {
         Ok(list_sessions()?
             .into_iter()
-            .filter(|session| session.username.as_deref().is_some_and(|value| value.eq_ignore_ascii_case(username)))
-            .filter(|session| matches!(session.state.as_str(), "active" | "connected" | "disconnected"))
+            .filter(|session| {
+                session
+                    .username
+                    .as_deref()
+                    .is_some_and(|value| value.eq_ignore_ascii_case(username))
+            })
+            .filter(|session| {
+                matches!(
+                    session.state.as_str(),
+                    "active" | "connected" | "disconnected"
+                )
+            })
             .count())
     }
 

@@ -139,10 +139,7 @@ fn router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/v1/users", get(list_users).post(create_user))
         .route("/v1/users/{username}", delete(delete_user))
-        .route(
-            "/v1/users/{username}/password/reset",
-            post(reset_password),
-        )
+        .route("/v1/users/{username}/password/reset", post(reset_password))
         .route("/v1/users/{username}/enabled", post(set_user_enabled))
         .route("/v1/users/{username}/admin", post(set_user_administrator))
         .route("/v1/sessions", get(list_sessions))
@@ -212,7 +209,10 @@ async fn create_user(
         addr,
         "admin_user_create",
         &request.username,
-        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        result
+            .as_ref()
+            .map(|_| ())
+            .map_err(|error| error.to_string()),
         request.reason,
         request_id,
     );
@@ -266,7 +266,10 @@ async fn delete_user(
         Ok(())
     })();
 
-    let status = result.as_ref().map(|_| ()).map_err(|error| error.to_string());
+    let status = result
+        .as_ref()
+        .map(|_| ())
+        .map_err(|error| error.to_string());
     audit_admin_action(
         &state,
         addr,
@@ -308,7 +311,10 @@ async fn reset_password(
         addr,
         "admin_password_reset",
         &username,
-        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        result
+            .as_ref()
+            .map(|_| ())
+            .map_err(|error| error.to_string()),
         request.reason,
         request_id,
     );
@@ -339,9 +345,16 @@ async fn set_user_enabled(
     audit_admin_action(
         &state,
         addr,
-        if request.enabled { "admin_user_enable" } else { "admin_user_disable" },
+        if request.enabled {
+            "admin_user_enable"
+        } else {
+            "admin_user_disable"
+        },
         &username,
-        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        result
+            .as_ref()
+            .map(|_| ())
+            .map_err(|error| error.to_string()),
         request.reason,
         request_id,
     );
@@ -380,9 +393,16 @@ async fn set_user_administrator(
     audit_admin_action(
         &state,
         addr,
-        if request.enabled { "admin_grant" } else { "admin_revoke" },
+        if request.enabled {
+            "admin_grant"
+        } else {
+            "admin_revoke"
+        },
         &username,
-        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        result
+            .as_ref()
+            .map(|_| ())
+            .map_err(|error| error.to_string()),
         request.reason,
         request_id,
     );
@@ -429,7 +449,10 @@ async fn logoff_session(
         addr,
         "admin_session_logoff",
         &format!("session:{session_id}"),
-        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        result
+            .as_ref()
+            .map(|_| ())
+            .map_err(|error| error.to_string()),
         request.reason,
         request_id,
     );

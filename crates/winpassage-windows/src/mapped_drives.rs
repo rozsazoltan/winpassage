@@ -88,9 +88,8 @@ mod imp {
             let drive_wide = to_wide(&drive);
             let mut buffer = vec![0u16; 2048];
             let mut len = buffer.len() as u32;
-            let status = unsafe {
-                WNetGetConnectionW(drive_wide.as_ptr(), buffer.as_mut_ptr(), &mut len)
-            };
+            let status =
+                unsafe { WNetGetConnectionW(drive_wide.as_ptr(), buffer.as_mut_ptr(), &mut len) };
 
             if status == NO_ERROR {
                 let remote = String::from_utf16_lossy(&buffer[..len as usize])
@@ -124,7 +123,8 @@ mod imp {
             let mut letter_wide = to_wide(&letter);
             let mut remote_wide = to_wide(&drive.remote_path);
 
-            let _ = unsafe { WNetCancelConnection2W(letter_wide.as_ptr(), CONNECT_UPDATE_PROFILE, 1) };
+            let _ =
+                unsafe { WNetCancelConnection2W(letter_wide.as_ptr(), CONNECT_UPDATE_PROFILE, 1) };
 
             let mut resource = NetResourceW {
                 dw_scope: 0,

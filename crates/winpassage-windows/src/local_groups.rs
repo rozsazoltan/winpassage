@@ -109,7 +109,9 @@ mod imp {
             len += 1;
         }
 
-        Some(String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len)))
+        Some(String::from_utf16_lossy(std::slice::from_raw_parts(
+            ptr, len,
+        )))
     }
 
     fn net_error(context: &str, code: u32) -> anyhow::Error {
