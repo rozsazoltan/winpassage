@@ -21,6 +21,18 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Restore aube cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/js
+            .aube
+            node_modules/.aube
+          key: aube-quality-${{ runner.os }}-${{ hashFiles('aube-workspace.yaml', '**/package.json') }}
+          restore-keys: |
+            aube-quality-${{ runner.os }}-
+            aube-${{ runner.os }}-
+
       - name: Set up aube
         uses: verzly/setup-aube@v1
         with:

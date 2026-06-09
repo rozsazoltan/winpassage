@@ -119,6 +119,19 @@ jobs:
           rustup default stable
           rustup target add x86_64-pc-windows-msvc
 
+      - name: Restore Rust dependency cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/rust
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-release-service-${{ runner.os }}-${{ matrix.binary }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          restore-keys: |
+            rust-release-service-${{ runner.os }}-${{ matrix.binary }}-
+            rust-release-service-${{ runner.os }}-
+            rust-${{ runner.os }}-
+
       - name: Install cargo-release
         uses: verzly/cargo-release@latest
         with:
@@ -183,6 +196,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Restore aube cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/js
+            .aube
+            node_modules/.aube
+          key: aube-release-tauri-${{ runner.os }}-${{ matrix.app }}-${{ hashFiles('aube-workspace.yaml', '**/package.json') }}
+          restore-keys: |
+            aube-release-tauri-${{ runner.os }}-${{ matrix.app }}-
+            aube-release-tauri-${{ runner.os }}-
+            aube-quality-${{ runner.os }}-
+            aube-${{ runner.os }}-
+
       - name: Set up aube
         uses: verzly/setup-aube@v1
         with:
@@ -195,6 +222,20 @@ jobs:
           rustup update stable
           rustup default stable
           rustup target add x86_64-pc-windows-msvc
+
+      - name: Restore Rust dependency cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/rust
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-release-tauri-${{ runner.os }}-${{ matrix.app }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          restore-keys: |
+            rust-release-tauri-${{ runner.os }}-${{ matrix.app }}-
+            rust-release-tauri-${{ runner.os }}-
+            rust-release-service-${{ runner.os }}-
+            rust-${{ runner.os }}-
 
       - name: Install tauri-release
         uses: verzly/tauri-release@latest
