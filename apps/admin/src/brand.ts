@@ -1,33 +1,31 @@
 export function winPassageMarkSvg(className = 'brand-svg'): string {
   return `
-    <svg class="${className}" viewBox="0 0 96 96" role="img" aria-label="WinPassage bridge lock mark">
+    <svg class="${className}" viewBox="0 0 96 96" role="img" aria-label="WinPassage secure bridge mark" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="wp-bg" x1="15" y1="10" x2="82" y2="90" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#1E3A5F" />
-          <stop offset="1" stop-color="#071426" />
+        <linearGradient id="wp-bridge-metal" x1="22" y1="18" x2="72" y2="82" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#F8FBFF" />
+          <stop offset="0.46" stop-color="#BAC8D9" />
+          <stop offset="1" stop-color="#61738B" />
         </linearGradient>
-        <linearGradient id="wp-metal" x1="29" y1="18" x2="70" y2="82" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#F4F8FC" />
-          <stop offset="0.48" stop-color="#AFC1D6" />
-          <stop offset="1" stop-color="#5F7590" />
+        <linearGradient id="wp-bridge-blue" x1="48" y1="63" x2="48" y2="91" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#4D90E8" stop-opacity="0.9" />
+          <stop offset="1" stop-color="#0B1B32" stop-opacity="0" />
         </linearGradient>
-        <linearGradient id="wp-blue" x1="48" y1="64" x2="48" y2="92" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#60A5FA" stop-opacity="0.85" />
-          <stop offset="1" stop-color="#0B1730" stop-opacity="0.15" />
-        </linearGradient>
+        <filter id="wp-soft-shadow" x="4" y="8" width="88" height="84" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feDropShadow dx="0" dy="3" stdDeviation="2.2" flood-color="#06101F" flood-opacity="0.25" />
+        </filter>
       </defs>
-      <rect x="4" y="4" width="88" height="88" rx="22" fill="url(#wp-bg)" />
-      <path d="M28 56 C38 49 58 49 68 56" stroke="#D8E3EF" stroke-width="3.5" stroke-linecap="round" opacity="0.82" />
-      <path d="M17 61 C30 55 35 43 44 43" stroke="url(#wp-metal)" stroke-width="5" stroke-linecap="round" fill="none" />
-      <path d="M79 61 C66 55 61 43 52 43" stroke="url(#wp-metal)" stroke-width="5" stroke-linecap="round" fill="none" />
-      <path d="M20 65 H76" stroke="#6F86A1" stroke-width="4" stroke-linecap="round" opacity="0.75" />
-      <path d="M30 57 V66 M38 49 V66 M58 49 V66 M66 57 V66" stroke="#D3E0EF" stroke-width="2.6" stroke-linecap="round" opacity="0.8" />
-      <path d="M35 45 V36 C35 26 41 19 48 19 C55 19 61 26 61 36 V45" stroke="url(#wp-metal)" stroke-width="8" stroke-linecap="round" fill="none" />
-      <path d="M34 43 H62 C65 43 67 45 67 48 V76 H29 V48 C29 45 31 43 34 43Z" fill="url(#wp-metal)" />
-      <path d="M41 77 V67 C41 59 45 55 48 55 C51 55 55 59 55 67 V77" fill="#071426" opacity="0.9" />
-      <path d="M48 51 m-5 0a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M48 55 L44 65 H52Z" fill="#071426" />
-      <path d="M33 83 C41 76 55 76 63 83 L63 90 H33Z" fill="url(#wp-blue)" opacity="0.7" />
-      <rect x="4.75" y="4.75" width="86.5" height="86.5" rx="21" fill="none" stroke="white" stroke-opacity="0.12" />
+      <g filter="url(#wp-soft-shadow)">
+        <path d="M18 63C29 59 35 50 40 42" stroke="url(#wp-bridge-metal)" stroke-width="6" stroke-linecap="round" />
+        <path d="M78 63C67 59 61 50 56 42" stroke="url(#wp-bridge-metal)" stroke-width="6" stroke-linecap="round" />
+        <path d="M18 67H78" stroke="url(#wp-bridge-metal)" stroke-width="5" stroke-linecap="round" />
+        <path d="M26 62V68M34 53V68M62 53V68M70 62V68" stroke="#DCE8F5" stroke-width="2.8" stroke-linecap="round" opacity="0.82" />
+        <path d="M35 46V35C35 24 41 17 48 17C55 17 61 24 61 35V46" stroke="url(#wp-bridge-metal)" stroke-width="8" stroke-linecap="round" />
+        <path d="M33 44H63C66 44 68 46 68 49V78H28V49C28 46 30 44 33 44Z" fill="url(#wp-bridge-metal)" />
+        <path d="M40 78V68C40 59 45 54 48 54C51 54 56 59 56 68V78" fill="#071426" opacity="0.92" />
+        <path d="M48 52m-5 0a5 5 0 1 0 10 0a5 5 0 1 0-10 0M48 56L44 66H52L48 56Z" fill="#071426" />
+        <path d="M33 84C41 77 55 77 63 84L64 90H32L33 84Z" fill="url(#wp-bridge-blue)" />
+      </g>
     </svg>`;
 }
 

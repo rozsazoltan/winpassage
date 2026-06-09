@@ -316,16 +316,18 @@ onMounted(() => {
 <template>
   <main class="app app-client">
     <section v-if="setupOpen" class="setup-overlay" role="dialog" aria-modal="true">
-      <article class="setup-card compact-card">
+      <article class="setup-card">
         <div class="setup-brand" v-html="brandIcon"></div>
         <p class="eyebrow">Initial setup</p>
-        <h1>Connect this client</h1>
-        <p class="lead">Add the server endpoint and your Windows username before the guide starts.</p>
+        <h1>Prepare WinPassageClient</h1>
+        <p class="lead">Set the server endpoint and username. The guided tour starts after setup.</p>
         <div class="form-grid two">
-          <label>Server URL<input v-model="serverUrl" placeholder="http://192.168.1.10:4487" /></label>
-          <label>Username<input v-model="username" autocomplete="username" placeholder="julia" /></label>
+          <label>Server endpoint<input v-model="serverUrl" placeholder="http://192.168.1.10:4487" /></label>
+          <label>Windows username<input v-model="username" autocomplete="username" placeholder="username" /></label>
         </div>
-        <div class="button-row end"><button class="btn-primary" :disabled="!serverUrl.trim() || !username.trim()" @click="saveInitialSetup">Save and continue</button></div>
+        <div class="button-row end">
+          <button class="btn-primary" :disabled="!serverUrl.trim() || !username.trim()" @click="saveInitialSetup">Save and continue</button>
+        </div>
       </article>
     </section>
 
@@ -333,7 +335,10 @@ onMounted(() => {
       <aside class="sidebar" aria-label="WinPassageClient navigation">
         <div class="brand-row">
           <span class="app-mark" v-html="brandIcon"></span>
-          <div><p class="brand-title">WinPassageClient</p><p class="brand-subtitle">Secure access</p></div>
+          <div>
+            <p class="brand-title">WinPassageClient</p>
+            <p class="brand-subtitle">Secure access</p>
+          </div>
         </div>
 
         <nav class="nav-list" aria-label="Main sections">
@@ -350,9 +355,12 @@ onMounted(() => {
 
       <section class="workspace">
         <header class="topbar">
-          <div><p class="eyebrow">{{ currentPage.label }}</p><h1>{{ currentPage.label }}</h1></div>
+          <div>
+            <p class="eyebrow">{{ currentPage.label }}</p>
+            <h1>{{ currentPage.label }}</h1>
+          </div>
           <div class="topbar-actions">
-            <button class="btn-ghost" @click="setupOpen = true"><span v-html="icon('settings')"></span>Initial setup</button>
+            <button class="btn-ghost" @click="setupOpen = true"><span v-html="icon('settings')"></span>Setup</button>
             <button class="btn-ghost" @click="startClientTour(true)"><span v-html="icon('play')"></span>Guide</button>
           </div>
         </header>
@@ -361,34 +369,48 @@ onMounted(() => {
         <p v-if="error" class="notice error"><span v-html="icon('warning')"></span>{{ error }}</p>
 
         <section v-if="activeTab === 'overview'" class="page-stack">
-          <article class="surface-card hero-card">
+          <article class="surface-card" id="client-password">
             <div class="card-title-row">
-              <div><h2>Initial setup</h2><p>Complete the basics before changing passwords or mounting drives.</p></div>
+              <div>
+                <h2>Self-service access</h2>
+                <p>Change your Windows password and keep mapped drives in sync.</p>
+              </div>
               <span class="hero-mark" v-html="brandIcon"></span>
             </div>
             <ol class="setup-list">
-              <li class="done"><span v-html="icon('check')"></span>Connect to server <strong>{{ connectionLabel }}</strong></li>
-              <li :class="{ done: username }"><span v-html="icon(username ? 'check' : 'info')"></span>Set Windows username <strong>{{ username || 'Not set' }}</strong></li>
-              <li><span v-html="icon('info')"></span>Create drive mappings <strong>{{ configuredDriveCount }} configured</strong></li>
+              <li class="done"><span v-html="icon('check')"></span>Server <strong>{{ connectionLabel }}</strong></li>
+              <li :class="{ done: username }"><span v-html="icon(username ? 'check' : 'info')"></span>User <strong>{{ username || 'Not set' }}</strong></li>
+              <li><span v-html="icon('info')"></span>Drive mappings <strong>{{ configuredDriveCount }} configured</strong></li>
             </ol>
+            <div class="button-row">
+              <button class="btn-primary" @click="activeTab = 'password'">Change password</button>
+              <button class="btn-secondary" @click="startClientTour(true)"><span v-html="icon('play')"></span>Start tour</button>
+            </div>
           </article>
 
-          <div class="overview-grid three">
-            <article class="surface-card metric"><span v-html="icon('network')"></span><p>Server</p><strong>{{ connectionLabel }}</strong></article>
-            <article class="surface-card metric"><span v-html="icon('password')"></span><p>Password</p><strong>{{ passwordScore }}%</strong></article>
-            <article class="surface-card metric"><span v-html="icon('drives')"></span><p>Drives</p><strong>{{ configuredDriveCount }}</strong><small>0 default drives</small></article>
+          <div class="page-grid two">
+            <article class="surface-card">
+              <h2>Connection</h2>
+              <div class="stat-list">
+                <span>Endpoint</span><strong>{{ serverUrl }}</strong>
+                <span>Username</span><strong>{{ username || '—' }}</strong>
+              </div>
+            </article>
+            <article class="surface-card">
+              <h2>Drives</h2>
+              <div class="stat-list">
+                <span>Configured</span><strong>{{ configuredDriveCount }}</strong>
+                <span>Default drives</span><strong>0</strong>
+              </div>
+              <button class="btn-secondary" @click="activeTab = 'drives'">Manage drives</button>
+            </article>
           </div>
-
-          <article class="surface-card guide-card">
-            <div><h2>Need a walkthrough?</h2><p>Use the guided tour to review password and drive workflows.</p></div>
-            <button class="btn-primary" @click="startClientTour(true)"><span v-html="icon('play')"></span>Start guided tour</button>
-          </article>
         </section>
 
-        <section v-if="activeTab === 'password'" id="client-password" class="page-grid two">
+        <section v-if="activeTab === 'password'" class="page-grid two">
           <article class="surface-card">
             <h2>Change password</h2>
-            <p class="muted">The server verifies your current password before applying the new one.</p>
+            <p class="muted">The central machine verifies your current password first.</p>
             <div class="form-grid two">
               <label>Username<input v-model="username" autocomplete="username" /></label>
               <label>Current password<input v-model="currentPassword" type="password" autocomplete="current-password" /></label>
@@ -397,27 +419,37 @@ onMounted(() => {
             </div>
             <div class="password-meter"><span :style="{ width: `${passwordScore}%` }"></span></div>
             <p class="muted">{{ passwordStatus }}</p>
-            <label class="check-row"><input v-model="reconnectDrives" type="checkbox" />Reconnect configured drives after password change</label>
+            <label class="check-row"><input v-model="reconnectDrives" type="checkbox" />Reconnect configured drives</label>
             <button class="btn-primary" :disabled="loading || !canSubmit" @click="changePassword">Change password</button>
           </article>
 
           <article class="surface-card">
-            <h2>Connection</h2>
-            <p class="muted">The server endpoint is changed from Settings to prevent accidental edits.</p>
-            <div class="stat-list"><span>Endpoint</span><strong>{{ serverUrl }}</strong><span>Drive mappings</span><strong>{{ configuredDriveCount }}</strong></div>
+            <h2>After success</h2>
+            <p class="muted">WinPassage can update only the drive mappings you configured.</p>
+            <div class="stat-list"><span>Server</span><strong>{{ connectionLabel }}</strong><span>Drives</span><strong>{{ configuredDriveCount }}</strong></div>
           </article>
         </section>
 
         <section v-if="activeTab === 'drives'" id="client-drives" class="page-stack">
           <article class="surface-card table-card">
-            <div class="card-title-row"><div><h2>Drive mappings</h2><p>Add only the network drives this workstation needs.</p></div><button class="btn-primary" @click="openDriveEditor()"><span v-html="icon('plus')"></span>Add drive</button></div>
-            <div v-if="drives.length === 0" class="empty-state"><span v-html="brandIcon"></span><h3>No drives configured</h3><p>WinPassage starts with zero default drive mappings.</p></div>
+            <div class="card-title-row">
+              <div><h2>Drive mappings</h2><p>No mappings are created by default.</p></div>
+              <button class="btn-primary" @click="openDriveEditor()"><span v-html="icon('plus')"></span>Add drive</button>
+            </div>
+            <div v-if="drives.length === 0" class="empty-state">
+              <span v-html="brandIcon"></span>
+              <h3>No drives configured</h3>
+              <p>Add only the network drives this workstation needs.</p>
+            </div>
             <div v-else class="table-wrap">
               <table class="data-table">
                 <thead><tr><th>Name</th><th>Letter</th><th>Remote path</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                   <tr v-for="drive in drives" :key="drive.id">
-                    <td><strong>{{ drive.name || 'Network drive' }}</strong></td><td>{{ drive.letter }}</td><td>{{ drive.remote_path }}</td><td><span class="pill" :class="drive.mounted ? 'success' : 'neutral'">{{ drive.mounted ? 'Mounted' : 'Not mounted' }}</span></td>
+                    <td><strong>{{ drive.name || 'Network drive' }}</strong></td>
+                    <td>{{ drive.letter }}</td>
+                    <td>{{ drive.remote_path }}</td>
+                    <td><span class="pill" :class="drive.mounted ? 'success' : 'neutral'">{{ drive.mounted ? 'Mounted' : 'Not mounted' }}</span></td>
                     <td class="row-actions">
                       <button class="icon-btn" :disabled="drive.busy" title="Mount" @click="mountDrive(drive)"><span v-html="icon('play')"></span></button>
                       <button class="icon-btn" :disabled="drive.busy" title="Unmount" @click="unmountDrive(drive)"><span v-html="icon('stop')"></span></button>
@@ -430,11 +462,13 @@ onMounted(() => {
             </div>
           </article>
 
-          <article class="surface-card">
-            <h2>Mount credentials</h2>
-            <p class="muted">Optional. If left empty, WinPassage uses the current or newly entered password during this session.</p>
-            <label>Drive password<input v-model="drivePassword" type="password" autocomplete="current-password" /></label>
-          </article>
+          <details class="advanced">
+            <summary>Mount credentials</summary>
+            <div class="form-grid">
+              <p class="muted">Optional. If empty, the current session password is used when available.</p>
+              <label>Drive password<input v-model="drivePassword" type="password" autocomplete="current-password" /></label>
+            </div>
+          </details>
         </section>
 
         <section v-if="activeTab === 'settings'" id="client-settings" class="page-grid two">
@@ -449,7 +483,7 @@ onMounted(() => {
 
           <article class="surface-card">
             <h2>Server connection</h2>
-            <p class="muted">Only change this when an administrator gives you a new IP:port.</p>
+            <p class="muted">Change only when an administrator gives you a new IP:port.</p>
             <div v-if="!connectionSettingsOpen" class="button-row between"><strong>{{ serverUrl }}</strong><button class="btn-secondary" @click="openConnectionSettings">Advanced edit</button></div>
             <div v-else class="form-grid">
               <label>Type CHANGE SERVER<input v-model="connectionUnlockInput" placeholder="CHANGE SERVER" /></label>
@@ -460,7 +494,7 @@ onMounted(() => {
 
           <article class="surface-card">
             <h2>Guided tour</h2>
-            <p class="muted">Replay the first-run walkthrough at any time.</p>
+            <p class="muted">Replay onboarding at any time.</p>
             <button class="btn-secondary" @click="startClientTour(true)">Replay tour</button>
           </article>
         </section>
@@ -468,8 +502,11 @@ onMounted(() => {
     </section>
 
     <section v-if="driveEditorOpen" class="drawer-backdrop" @click.self="closeDriveEditor">
-      <aside class="drawer surface-card" role="dialog" aria-modal="true">
-        <div class="card-title-row"><div><h2>{{ editingDriveId ? 'Edit drive' : 'Add drive' }}</h2><p>Map a network drive for this workstation.</p></div><button class="icon-btn" @click="closeDriveEditor"><span v-html="icon('x')"></span></button></div>
+      <aside class="drawer" role="dialog" aria-modal="true">
+        <div class="card-title-row">
+          <div><h2>{{ editingDriveId ? 'Edit drive' : 'Add drive' }}</h2><p>Map one network location.</p></div>
+          <button class="icon-btn" @click="closeDriveEditor"><span v-html="icon('x')"></span></button>
+        </div>
         <div class="form-grid">
           <label>Name<input v-model="driveFormName" placeholder="Projects" /></label>
           <label>Drive letter<input v-model="driveFormLetter" placeholder="S:" /></label>

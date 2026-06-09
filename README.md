@@ -169,7 +169,7 @@ Open **WinPassageAdmin**, add the central machine by IP/DNS address, load users,
 
 The central machine is the Windows 11 Pro computer that owns the local user accounts and shared folders. A machine becomes a WinPassage server only after the server service is installed from **WinPassageAdmin** with administrator privileges.
 
-Use **Demote this computer back to client-only mode** in WinPassageAdmin to stop and remove the local WinPassage service. Demotion removes the WinPassage service and optionally the copied WinPassage executables, but it never deletes Windows users or profiles.
+Use **Settings → Advanced → Remove local server service** in WinPassageAdmin to stop and remove the local WinPassage service. This removes only WinPassage service components and optionally the copied WinPassage executables. It never deletes Windows users or profiles.
 
 Before users start using WinPassage, the operator should confirm:
 
