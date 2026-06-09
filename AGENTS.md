@@ -257,6 +257,8 @@ Shell/automation:
 - Scripts should be Windows-aware but not break Linux CI for non-Windows checks.
 - Do not require global package installs when workspace scripts can be used.
 - Keep generated files out of version control.
+- Quality workflows must be PR-first: use `pull_request` targeting `master` plus optional `workflow_dispatch`, but do not add `push` triggers for `master` unless the repository policy changes.
+- Release and destructive Windows validation workflows must stay manual.
 
 ## Typical change patterns
 
