@@ -205,7 +205,7 @@ Use the published Verzly action line:
 
 - `verzly/rust-cache@v0`
 - `verzly/cargo-release@v0`
-- `verzly/github-release@v0`
+- `verzly/github-release@latest`
 - `verzly/tauri-release@v0`
 - `verzly/setup-aube@v1`
 
@@ -292,3 +292,8 @@ Get-CimInstance Win32_UserProfile |
 ```
 
 Do not test account deletion, administrator revocation, or session logoff on your only administrator account.
+
+
+## Release workflow compatibility
+
+The release workflow uses `verzly/github-release@latest` for `prepare`, `finalize`, and failed release branch cleanup. The release branch commit is verified with `git rev-parse HEAD` instead of a tool-specific helper subcommand so the workflow stays compatible with the published `github-release` CLI contract. Release assets must be passed to `github-release finalize` with `--assets`.
