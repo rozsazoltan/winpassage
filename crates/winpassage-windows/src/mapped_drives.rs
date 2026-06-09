@@ -1,5 +1,5 @@
 use anyhow::Result;
-use winpassage_protocol::{DriveMapping, DriveReconnectResult};
+use winpassage_protocol::{DriveMapping, DriveOperationResponse, DriveReconnectResult};
 
 #[cfg(windows)]
 mod imp {
@@ -105,6 +105,60 @@ mod imp {
         Ok(drives)
     }
 
+    pub fn mount_mapped_drive(
+        username: &str,
+        password: &str,
+        drive: &DriveMapping,
+    ) -> Result<DriveOperationResponse> {
+        let letter = normalize_drive_letter(&drive.letter);
+        let mut letter_wide = to_wide(&letter);
+        let mut remote_wide = to_wide(&drive.remote_path);
+        let username_wide = to_wide(username);
+        let mut password_wide = to_wide(password);
+
+        let mut resource = NetResourceW {
+            dw_scope: 0,
+            dw_type: RESOURCETYPE_DISK,
+            dw_display_type: 0,
+            dw_usage: 0,
+            lp_local_name: letter_wide.as_mut_ptr(),
+            lp_remote_name: remote_wide.as_mut_ptr(),
+            lp_comment: null_mut(),
+            lp_provider: null_mut(),
+        };
+
+        let status = unsafe {
+            WNetAddConnection2W(
+                &mut resource,
+                password_wide.as_ptr(),
+                username_wide.as_ptr(),
+                CONNECT_UPDATE_PROFILE,
+            )
+        };
+        password_wide.zeroize();
+
+        Ok(DriveOperationResponse {
+            success: status == NO_ERROR,
+            letter,
+            remote_path: Some(drive.remote_path.clone()),
+            message: message_for(status),
+        })
+    }
+
+    pub fn unmount_mapped_drive(letter: &str) -> Result<DriveOperationResponse> {
+        let normalized = normalize_drive_letter(letter);
+        let letter_wide = to_wide(&normalized);
+        let status =
+            unsafe { WNetCancelConnection2W(letter_wide.as_ptr(), CONNECT_UPDATE_PROFILE, 1) };
+
+        Ok(DriveOperationResponse {
+            success: status == NO_ERROR,
+            letter: normalized,
+            remote_path: None,
+            message: message_for(status),
+        })
+    }
+
     pub fn reconnect_mapped_drives(
         username: &str,
         password: &str,
@@ -180,6 +234,18 @@ mod imp {
     ) -> Result<Vec<DriveReconnectResult>> {
         bail!("mapped drive reconnect is available only on Windows")
     }
+
+    pub fn mount_mapped_drive(
+        _username: &str,
+        _password: &str,
+        _drive: &DriveMapping,
+    ) -> Result<DriveOperationResponse> {
+        bail!("mapped drive mount is available only on Windows")
+    }
+
+    pub fn unmount_mapped_drive(_letter: &str) -> Result<DriveOperationResponse> {
+        bail!("mapped drive unmount is available only on Windows")
+    }
 }
 
 pub fn list_mapped_drives() -> Result<Vec<DriveMapping>> {
@@ -192,4 +258,16 @@ pub fn reconnect_mapped_drives(
     drives: &[DriveMapping],
 ) -> Result<Vec<DriveReconnectResult>> {
     imp::reconnect_mapped_drives(username, password, drives)
+}
+
+pub fn mount_mapped_drive(
+    username: &str,
+    password: &str,
+    drive: &DriveMapping,
+) -> Result<DriveOperationResponse> {
+    imp::mount_mapped_drive(username, password, drive)
+}
+
+pub fn unmount_mapped_drive(letter: &str) -> Result<DriveOperationResponse> {
+    imp::unmount_mapped_drive(letter)
 }

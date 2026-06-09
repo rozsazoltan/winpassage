@@ -59,8 +59,16 @@ Privileged server updates should be applied through the dedicated updater/servic
 
 ## Local server installation safety
 
-WinPassage Admin must require a Windows administrator account for local service installation, service removal, and server demotion. Opening the admin app from a standard account should show a locked state with instructions to switch to an administrator account.
+WinPassageAdmin must require a Windows administrator account for local service installation, service removal, and server demotion. Opening the admin app from a standard account should show a locked state with instructions to switch to an administrator account.
 
-WinPassage Client must not contain server installation or service-management features.
+WinPassageClient must not contain server installation or service-management features.
 
 Changing the service port changes how clients and admins connect to the server. Operators must distribute the correct `IP:port` value to client profiles after changing the port.
+
+## Release deletion
+
+Release deletion is a manual, destructive operation. Use the **Delete Release** workflow only for incorrectly published releases or tags. Prefer a new patch release if the previous release may already be in use.
+
+## Client drive mappings
+
+WinPassageClient must not ship default mapped drives. Drive mappings may reveal network structure and must be added explicitly on each workstation. Individual mount/unmount actions must use the current request credentials and must not store passwords.

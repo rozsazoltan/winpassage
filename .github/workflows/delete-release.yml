@@ -1,0 +1,77 @@
+name: Delete Release
+run-name: Delete release v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to delete without the v prefix. Example: 0.2.0."
+        required: true
+        type: string
+      confirm:
+        description: "Type DELETE X.Y.Z to confirm release and tag deletion."
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: delete-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  delete:
+    name: Delete release and tag
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INPUT_VERSION: ${{ inputs.version }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Validate input
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION}"
+          if [[ "${version}" == v* ]]; then
+            echo "::error::Version must be provided without the v prefix. Use '${version#v}' instead of '${version}'."
+            exit 1
+          fi
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Version must be SemVer without the v prefix."
+            exit 1
+          fi
+          expected="DELETE ${version}"
+          if [ "${CONFIRM}" != "${expected}" ]; then
+            echo "::error::Confirmation mismatch. Type '${expected}'."
+            exit 1
+          fi
+
+      - name: Delete GitHub Release if present
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${INPUT_VERSION}"
+          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '.id' 2>/dev/null || true)"
+          if [ -n "${release_id}" ]; then
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}" >/dev/null
+            echo "Deleted release ${tag}."
+          else
+            echo "::notice::Release ${tag} does not exist."
+          fi
+
+      - name: Delete Git tag if present
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${INPUT_VERSION}"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" >/dev/null
+            echo "Deleted tag ${tag}."
+          else
+            echo "::notice::Tag ${tag} does not exist."
+          fi

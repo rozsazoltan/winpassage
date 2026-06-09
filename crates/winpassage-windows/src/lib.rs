@@ -14,7 +14,9 @@ pub use local_users::{
     change_own_password, create_local_user, delete_local_user, reset_local_user_password,
     set_local_user_enabled,
 };
-pub use mapped_drives::{list_mapped_drives, reconnect_mapped_drives};
+pub use mapped_drives::{
+    list_mapped_drives, mount_mapped_drive, reconnect_mapped_drives, unmount_mapped_drive,
+};
 pub use sessions::{active_session_count_for_user, list_sessions, logoff_session};
 
 pub fn list_local_users() -> Result<Vec<LocalUserSummary>> {

@@ -125,6 +125,21 @@ pub struct DriveMapping {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MountMappedDriveRequest {
+    pub username: String,
+    pub password: String,
+    pub drive: DriveMapping,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriveOperationResponse {
+    pub success: bool,
+    pub letter: String,
+    pub remote_path: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReconnectMappedDrivesRequest {
     pub username: String,
     pub password: String,

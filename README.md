@@ -24,6 +24,7 @@ It provides a Windows background agent, an admin desktop app, and a client deskt
   - [Mapped drives](#mapped-drives)
   - [Audit log](#audit-log)
   - [Updates](#updates)
+  - [Release rollback](#release-rollback)
   - [Connection limits](#connection-limits)
   - [Security model](#security-model)
 - [Configuration](#configuration)
@@ -58,8 +59,8 @@ The central machine runs `winpassage-server.exe` as a Windows Service. It expose
 
 The admin and client apps are Tauri 2 desktop apps. They are intentionally separate:
 
-- `WinPassage Admin` is for the owner, IT operator, or trusted administrator;
-- `WinPassage Client` is for regular users who only need self-service password change.
+- `WinPassageAdmin` is for the owner, IT operator, or trusted administrator;
+- `WinPassageClient` is for regular users who only need self-service password change.
 
 ### EU-oriented small network workflow
 
@@ -98,8 +99,8 @@ WinPassage is used in three places:
 
 ```text
 central Windows Pro machine  ->  winpassage-server.exe Windows Service
-administrator workstation    ->  WinPassage Admin
-user workstation             ->  WinPassage Client
+administrator workstation    ->  WinPassageAdmin
+user workstation             ->  WinPassageClient
 ```
 
 Detailed deployment and service setup belongs in `CONTRIBUTING.md`. This README focuses on daily usage and operational behavior.
@@ -118,13 +119,14 @@ https://github.com/rozsazoltan/winpassage/releases/latest
 On the central Windows Pro machine, place these files in the same folder:
 
 ```text
-WinPassage Admin.exe
+WinPassageAdmin installer or executable
+WinPassageClient installer or executable
 winpassage-server.exe
 winpassage-agentctl.exe
 winpassage-updater.exe
 ```
 
-Sign in with a local administrator account, open **WinPassage Admin**, and use **Make this computer a WinPassage server**:
+Install **WinPassageAdmin** on the central computer, sign in with a local administrator account, open the app, and use **Make this computer a WinPassage server**:
 
 ```text
 Binary source folder: folder containing the three service executables
@@ -149,23 +151,25 @@ http://192.168.1.10:4487
 Install the desktop apps where needed:
 
 ```text
-WinPassage Admin  -> central machine or administrator workstation
-WinPassage Client -> user workstations
+WinPassageAdmin  -> central machine or administrator workstation
+WinPassageClient -> user workstations
 ```
 
-Open **WinPassage Admin**, add the central machine by IP/DNS address, load users, and test with a disposable local Windows account first.
+Both desktop apps may be installed on the same computer. They are separate applications and their app names intentionally do not contain spaces.
+
+Open **WinPassageAdmin**, add the central machine by IP/DNS address, load users, and test with a disposable local Windows account first.
 
 > [!TIP]
-> If you open WinPassage Admin from a standard Windows account, the app shows a lock screen. Sign in with a local administrator account or run the app as administrator before installing or managing the local service.
+> If you open WinPassageAdmin from a standard Windows account, the app shows a lock screen. If you are signed in with an administrator account but the app is not elevated, the console opens, but local service install/remove actions still require **Run as administrator**.
 
 > [!IMPORTANT]
 > Do not expose the WinPassage port to the public internet. Keep it on a trusted LAN/VPN and use a long random admin token.
 
 ### Server machine
 
-The central machine is the Windows 11 Pro computer that owns the local user accounts and shared folders. A machine becomes a WinPassage server only after the server service is installed from **WinPassage Admin** with administrator privileges.
+The central machine is the Windows 11 Pro computer that owns the local user accounts and shared folders. A machine becomes a WinPassage server only after the server service is installed from **WinPassageAdmin** with administrator privileges.
 
-Use **Demote this computer back to client-only mode** in WinPassage Admin to stop and remove the local WinPassage service. Demotion removes the WinPassage service and optionally the copied WinPassage executables, but it never deletes Windows users or profiles.
+Use **Demote this computer back to client-only mode** in WinPassageAdmin to stop and remove the local WinPassage service. Demotion removes the WinPassage service and optionally the copied WinPassage executables, but it never deletes Windows users or profiles.
 
 Before users start using WinPassage, the operator should confirm:
 
@@ -195,7 +199,7 @@ Expected response:
 
 ### Multiple central machines
 
-A single `WinPassage Admin` installation can keep local shortcuts for multiple standalone WinPassage servers. This is useful when one operator manages several small networks, branches, workshops, or office rooms where each location has its own Windows Pro central machine.
+A single `WinPassageAdmin` installation can keep local shortcuts for multiple standalone WinPassage servers. This is useful when one operator manages several small networks, branches, workshops, or office rooms where each location has its own Windows Pro central machine.
 
 Each server profile contains only connection metadata:
 
@@ -215,11 +219,11 @@ The profile does not store Windows users and should not store admin passwords. U
 
 ### Admin app
 
-Install `WinPassage Admin` on the central machine or an administrator workstation.
+Install `WinPassageAdmin` on the central machine or an administrator workstation.
 
 On the central machine, the app requires a Windows administrator account for local server installation, demotion, and service management. Standard users see a locked screen with instructions to switch to an administrator account.
 
-Open the app and register one or more server profiles:
+On first launch, complete the short setup screen before the in-app guide starts. Then register one or more server profiles:
 
 ```text
 Name:        Office server
@@ -237,9 +241,9 @@ Use **Load users & sessions** to list users and sessions from the selected serve
 
 ### Client app
 
-Install `WinPassage Client` on each workstation that maps shared drives from the central machine.
+Install `WinPassageClient` on each workstation that maps shared drives from the central machine.
 
-The server address is configured during deployment or support. It is shown to the user, but its modification is kept behind **Advanced connection settings** so regular users do not accidentally point the app at the wrong machine.
+On first launch, complete the short setup screen before the in-app guide starts. The server address is configured during deployment or support. It is shown to the user, but its modification is kept behind **Advanced connection settings** so regular users do not accidentally point the app at the wrong machine.
 
 For normal use, the user enters:
 
@@ -252,13 +256,7 @@ Confirm new password
 
 After a successful password change, the client can reconnect configured mapped drives with the new credentials.
 
-Default drive examples:
-
-```text
-S: -> \\CENTRAL-PC\Shared
-I: -> \\CENTRAL-PC\Internal
-G: -> \\CENTRAL-PC\Groups
-```
+WinPassageClient starts with **zero** default drive mappings. Add only the drive letters and share paths used on that workstation. Each drive can be mounted, unmounted, edited, or deleted individually.
 
 ## Usage
 
@@ -329,7 +327,7 @@ Invoke-RestMethod `
 
 ### Mapped drives
 
-After a successful password change, the client app reconnects selected mapped drives using the new credentials.
+After a successful password change, the client app can reconnect configured mapped drives using the new credentials.
 
 The current implementation uses Windows network-drive APIs instead of passing passwords through `net use` command-line arguments.
 
@@ -338,8 +336,8 @@ Typical flow:
 ```text
 1. user changes central password
 2. server returns success
-3. client disconnects configured drives
-4. client reconnects them with username + new password
+3. client reconnects configured drives with username + new password
+4. individual drives can also be mounted or unmounted manually
 5. Windows updates remembered mappings for the user profile
 ```
 
@@ -374,6 +372,32 @@ Example:
 ```json
 {"timestamp":"2026-06-09T10:30:00Z","event":"self_password_change","actor":"julia","subject":"julia","result":"success","request_id":"..."}
 ```
+
+### Updates
+
+`winpassage-updater.exe` is the dedicated updater entrypoint. It must only use the official repository:
+
+```text
+https://github.com/rozsazoltan/winpassage
+```
+
+Do not configure custom update hosts or mirrors. Update application should verify artifact names, checksums, and the official GitHub source before replacing installed binaries.
+
+### Release rollback
+
+Use the manual **Delete Release** workflow only when a release must be withdrawn, for example after publishing assets with incorrect names or broken binaries.
+
+GitHub Actions input:
+
+```text
+version: 0.2.0
+confirm: DELETE 0.2.0
+```
+
+The workflow deletes the GitHub Release and the matching `vX.Y.Z` tag. It does not change already installed machines. Publish a corrected patch release for normal users whenever possible.
+
+> [!WARNING]
+> Release deletion is destructive. Prefer a new patch release if the incorrect release may already have been downloaded.
 
 ### Connection limits
 

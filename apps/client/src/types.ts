@@ -24,3 +24,10 @@ export interface DriveReconnectResult {
 export interface ReconnectMappedDrivesResponse {
   results: DriveReconnectResult[];
 }
+
+export interface DriveOperationResponse {
+  success: boolean;
+  letter: string;
+  remote_path?: string;
+  message: string;
+}
