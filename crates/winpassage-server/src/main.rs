@@ -22,9 +22,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Serve(options) => {
-            http::serve_until_shutdown(config_from_options(options)?).await
-        }
+        Command::Serve(options) => http::serve_until_shutdown(config_from_options(options)?).await,
         Command::Service(options) => run_as_service(options),
     }
 }

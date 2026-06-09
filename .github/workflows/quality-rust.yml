@@ -30,28 +30,17 @@ jobs:
         with:
           install-only: true
 
-      - name: Format
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo fmt --all -- --check
-
-      - name: Check all targets
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo check --workspace --all-targets
-
-      - name: Clippy
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Unit and non-destructive integration tests
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo test --workspace --all-targets
-
-      - name: Documentation tests
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo test --workspace --doc
-
-      - name: Rustdoc warnings
+      - name: Rust strict quality
         shell: bash
         env:
           RUSTDOCFLAGS: "-D warnings"
-        run: rust-cache run --config rust-cache.toml -- cargo doc --workspace --no-deps
+        run: |
+          rust-cache run --config rust-cache.toml -- bash -lc '
+            set -euo pipefail
+            cargo fmt --all -- --check
+            cargo check --workspace --all-targets
+            cargo clippy --workspace --all-targets -- -D warnings
+            cargo test --workspace --all-targets
+            cargo test --workspace --doc
+            cargo doc --workspace --no-deps
+          '

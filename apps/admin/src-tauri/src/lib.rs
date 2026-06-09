@@ -78,7 +78,9 @@ fn install_server_mode(request: InstallServerRequest) -> Result<ServerInstallRes
     ensure_elevated()?;
     validate_bind_host(&request.bind_host)?;
     if request.admin_token.trim().len() < 16 {
-        return Err("Admin token must be at least 16 characters for a server installation.".to_string());
+        return Err(
+            "Admin token must be at least 16 characters for a server installation.".to_string(),
+        );
     }
 
     let install_dir = request
@@ -227,7 +229,10 @@ fn validate_bind_host(value: &str) -> Result<(), String> {
     }
 
     if trimmed.contains('/') || trimmed.contains(':') {
-        return Err("Bind host must be an IP address or hostname without protocol, path, or port.".to_string());
+        return Err(
+            "Bind host must be an IP address or hostname without protocol, path, or port."
+                .to_string(),
+        );
     }
 
     Ok(())

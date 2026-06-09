@@ -436,3 +436,8 @@ Server installation UI belongs in `apps/admin` and must be gated behind local Wi
 The admin app may install `winpassage-server.exe`, `winpassage-agentctl.exe`, and `winpassage-updater.exe` into `C:\Program Files\WinPassage`, configure a custom port, and call `winpassage-agentctl` to install/start/stop/delete the Windows Service.
 
 Server demotion must remove only the WinPassage service and optionally copied WinPassage executables. Do not delete Windows accounts, Windows profiles, shared folders, mapped drives, or audit logs during demotion.
+
+
+### Rust Quality cache rule
+
+Keep the PR Rust Quality workflow cache-friendly. The workflow should install `verzly/rust-cache` once and run the strict Rust sequence inside one `rust-cache run --config rust-cache.toml -- bash -lc ...` invocation. Do not reintroduce separate `rust-cache run` steps for format, check, clippy, tests, doctests, and docs unless there is a clear measured reason. The `.cache` target directory must stay shared across those commands in the same job.
