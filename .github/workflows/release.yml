@@ -86,6 +86,8 @@ jobs:
             config: .github/release/winpassage-server.cargo-release.toml
           - binary: winpassage-agentctl
             config: .github/release/winpassage-agentctl.cargo-release.toml
+          - binary: winpassage-updater
+            config: .github/release/winpassage-updater.cargo-release.toml
     steps:
       - name: Checkout release branch
         uses: actions/checkout@v6
@@ -131,11 +133,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo-release build \
-            --config "${{ matrix.config }}" \
-            --output "dist/release/${{ matrix.binary }}" \
-            --windows-x64 \
-            --verbose
+          cargo-release build --config "${{ matrix.config }}"
 
       - name: Upload service artifact
         uses: actions/upload-artifact@v7

@@ -1,0 +1,29 @@
+[project]
+root = "."
+binary = "winpassage-updater"
+
+[build]
+out_dir = "dist/release/winpassage-updater"
+default_strategy = "host"
+container_engine = "podman"
+
+[artifacts]
+checksum = true
+manifest = true
+name_template = "winpassage-updater-v{version}-{target}{ext}"
+
+[targets.windows-x64]
+enabled = true
+triple = "x86_64-pc-windows-msvc"
+strategy = "host"
+command = "rust-cache run --config rust-cache.toml -- cargo build --release -p winpassage-updater --target x86_64-pc-windows-msvc"
+artifacts = [".cache/rust/packages/winpassage/target/x86_64-pc-windows-msvc/release/winpassage-updater.exe"]
+
+[targets.linux-x64]
+enabled = false
+
+[targets.macos-x64]
+enabled = false
+
+[targets.macos-arm64]
+enabled = false

@@ -297,3 +297,7 @@ Do not test account deletion, administrator revocation, or session logoff on you
 ## Release workflow compatibility
 
 The release workflow uses `verzly/github-release@latest` for `prepare`, `finalize`, and failed release branch cleanup. The release branch commit is verified with `git rev-parse HEAD` instead of a tool-specific helper subcommand so the workflow stays compatible with the published `github-release` CLI contract. Release assets must be passed to `github-release finalize` with `--assets`.
+
+## Updater source policy
+
+`winpassage-updater` is the dedicated update entrypoint. It must only resolve metadata and release assets from `https://github.com/rozsazoltan/winpassage` and the matching GitHub releases API. Do not add custom update hosts, mirrors, or user-configurable repositories.

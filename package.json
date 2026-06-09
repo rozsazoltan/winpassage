@@ -10,6 +10,7 @@
     "build:client": "aube run tauri:build --filter winpassage-client",
     "build:server": "cargo build --release -p winpassage-server",
     "build:agentctl": "cargo build --release -p winpassage-agentctl",
+    "build:updater": "cargo build --release -p winpassage-updater",
     "fmt:rust": "cargo fmt --all",
     "fmt:rust:check": "cargo fmt --all -- --check",
     "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
