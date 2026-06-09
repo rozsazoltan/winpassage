@@ -410,3 +410,8 @@ Password values must never be logged, returned, embedded in URLs, included in pa
 The admin UI should make real Windows-side effects visible. User deletion, administrator revocation, password reset, and session logoff must be visually separated from low-risk actions. Use warning/danger panels, exact username confirmation where destructive, and an audit reason field close to the action.
 
 The table must communicate that data is loaded from Windows, not from a WinPassage database. Administrator status is a capability badge, not a localized Windows group label.
+
+
+## Release workflow compatibility
+
+Use the Verzly release tools the same way the working release templates do: install `verzly/github-release@latest`, run `github-release prepare`, build artifacts from the generated release branch, and run `github-release finalize` with `--assets`. Do not call unsupported helper subcommands such as `github-release assert-head` unless the checked-in toolchain contract explicitly documents them. If a release branch commit must be verified, capture `git rev-parse HEAD` after `prepare` and compare that SHA with `git rev-parse HEAD` in build jobs.

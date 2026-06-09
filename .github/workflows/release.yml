@@ -31,10 +31,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.prepare.outputs.version }}
-      version_tag: ${{ steps.prepare.outputs.version_tag }}
+      tag: ${{ steps.prepare.outputs.tag }}
       release_branch: ${{ steps.prepare.outputs.release_branch }}
       target_branch: ${{ steps.prepare.outputs.target_branch }}
-      release_sha: ${{ steps.prepare.outputs.release_sha }}
+      release_sha: ${{ steps.release_head.outputs.release_sha }}
     steps:
       - name: Checkout target branch
         uses: actions/checkout@v6
@@ -44,13 +44,14 @@ jobs:
           persist-credentials: true
 
       - name: Install github-release
-        uses: verzly/github-release@v0
+        uses: verzly/github-release@latest
         with:
           install-only: true
 
       - name: Configure Git author
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -63,6 +64,15 @@ jobs:
             --version "${{ inputs.version }}" \
             --target-branch "${{ inputs.ref }}" \
             --config ".github/release/winpassage.github-release.toml"
+
+      - name: Capture release branch commit
+        id: release_head
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_sha="$(git rev-parse HEAD)"
+          echo "release_sha=${release_sha}" >> "${GITHUB_OUTPUT}"
+          echo "Release branch HEAD: ${release_sha}"
 
   build-service:
     name: Build service binaries
@@ -83,14 +93,21 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.release_branch }}
           fetch-depth: 0
 
-      - name: Install github-release
-        uses: verzly/github-release@v0
-        with:
-          install-only: true
-
       - name: Verify release branch commit
         shell: bash
-        run: github-release assert-head --sha "${{ needs.prepare-release.outputs.release_sha }}"
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          expected_sha="${{ needs.prepare-release.outputs.release_sha }}"
+          if [ -z "${expected_sha}" ]; then
+            echo "::error::prepare-release did not expose release_sha"
+            exit 1
+          fi
+          if [ "${actual_sha}" != "${expected_sha}" ]; then
+            echo "::error::Release branch HEAD mismatch. Expected ${expected_sha}, got ${actual_sha}."
+            exit 1
+          fi
+          echo "Verified release branch HEAD: ${actual_sha}"
 
       - name: Set up Rust
         shell: bash
@@ -101,18 +118,19 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
       - name: Install cargo-release
-        uses: verzly/cargo-release@v0
+        uses: verzly/cargo-release@latest
         with:
           install-only: true
 
       - name: Install rust-cache
-        uses: verzly/rust-cache@v0
+        uses: verzly/rust-cache@latest
         with:
           install-only: true
 
       - name: Build ${{ matrix.binary }}
         shell: bash
         run: |
+          set -euo pipefail
           cargo-release build \
             --config "${{ matrix.config }}" \
             --output "dist/release/${{ matrix.binary }}" \
@@ -146,14 +164,21 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.release_branch }}
           fetch-depth: 0
 
-      - name: Install github-release
-        uses: verzly/github-release@v0
-        with:
-          install-only: true
-
       - name: Verify release branch commit
         shell: bash
-        run: github-release assert-head --sha "${{ needs.prepare-release.outputs.release_sha }}"
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          expected_sha="${{ needs.prepare-release.outputs.release_sha }}"
+          if [ -z "${expected_sha}" ]; then
+            echo "::error::prepare-release did not expose release_sha"
+            exit 1
+          fi
+          if [ "${actual_sha}" != "${expected_sha}" ]; then
+            echo "::error::Release branch HEAD mismatch. Expected ${expected_sha}, got ${actual_sha}."
+            exit 1
+          fi
+          echo "Verified release branch HEAD: ${actual_sha}"
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -174,13 +199,14 @@ jobs:
           rustup target add x86_64-pc-windows-msvc
 
       - name: Install tauri-release
-        uses: verzly/tauri-release@v0
+        uses: verzly/tauri-release@latest
         with:
           install-only: true
 
       - name: Build ${{ matrix.app }}
         shell: bash
         run: |
+          set -euo pipefail
           tauri-release build \
             --config "${{ matrix.config }}" \
             --output "dist/release/winpassage-${{ matrix.app }}" \
@@ -199,12 +225,16 @@ jobs:
     name: Publish GitHub Release
     needs: [prepare-release, build-service, build-tauri]
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout release branch
+      - name: Checkout target branch
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.prepare-release.outputs.release_branch }}
+          ref: ${{ needs.prepare-release.outputs.target_branch }}
           fetch-depth: 0
+          persist-credentials: true
 
       - name: Download artifacts
         uses: actions/download-artifact@v7
@@ -217,16 +247,17 @@ jobs:
           set -euo pipefail
           mkdir -p "${RELEASE_UPLOAD_DIR}"
           find "${RELEASE_ARTIFACT_DIR}" -type f -exec cp {} "${RELEASE_UPLOAD_DIR}" \;
-          find "${RELEASE_UPLOAD_DIR}" -type f -maxdepth 1 -print | sort
+          find "${RELEASE_UPLOAD_DIR}" -maxdepth 1 -type f -print | sort
 
       - name: Install github-release
-        uses: verzly/github-release@v0
+        uses: verzly/github-release@latest
         with:
           install-only: true
 
       - name: Configure Git author
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -239,4 +270,32 @@ jobs:
             --target-branch "${{ needs.prepare-release.outputs.target_branch }}" \
             --release-branch "${{ needs.prepare-release.outputs.release_branch }}" \
             --version "${{ needs.prepare-release.outputs.version }}" \
-            --artifact-dir "${RELEASE_UPLOAD_DIR}"
+            --assets "${RELEASE_UPLOAD_DIR}"
+
+  cleanup-failed-release-branch:
+    name: Delete failed release branch
+    needs: [prepare-release, build-service, build-tauri, publish-release]
+    if: >-
+      always()
+      && needs.prepare-release.result == 'success'
+      && needs.publish-release.result != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install github-release
+        uses: verzly/github-release@latest
+        with:
+          install-only: true
+
+      - name: Cleanup release branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          github-release abort \
+            --config ".github/release/winpassage.github-release.toml" \
+            --release-branch "${{ needs.prepare-release.outputs.release_branch }}"
