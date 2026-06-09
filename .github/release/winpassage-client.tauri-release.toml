@@ -1,7 +1,7 @@
 [project]
 project_dir = "apps/client"
-package_manager = "pnpm"
-install_command = "corepack enable && corepack prepare pnpm@10.32.1 --activate && pnpm install --no-frozen-lockfile"
+package_manager = "aube"
+install_command = "aube install"
 
 [output]
 clean = true

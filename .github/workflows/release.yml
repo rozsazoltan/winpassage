@@ -21,8 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: "22"
-  PNPM_VERSION: "10.32.1"
+  NODE_VERSION: "24"
   RELEASE_ARTIFACT_DIR: dist/release-artifacts
   RELEASE_UPLOAD_DIR: dist/release-upload
 
@@ -155,13 +154,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Set up pnpm
-        shell: bash
-        run: |
-          set -euo pipefail
-          corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
-          pnpm --version
+      - name: Set up aube
+        uses: verzly/setup-aube@v1
+        with:
+          run_install: true
 
       - name: Set up Rust
         shell: bash
@@ -170,10 +166,6 @@ jobs:
           rustup update stable
           rustup default stable
           rustup target add x86_64-pc-windows-msvc
-
-      - name: Install dependencies
-        shell: bash
-        run: pnpm install --no-frozen-lockfile
 
       - name: Install tauri-release
         uses: verzly/tauri-release@v0

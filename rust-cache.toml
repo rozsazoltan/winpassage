@@ -9,5 +9,5 @@ target_dir = "rust/packages/{package}/target"
 
 [env]
 NPM_CONFIG_CACHE = "js/npm"
-PNPM_STORE_PATH = "js/pnpm-store"
+AUBE_STORE_PATH = "js/aube-store"
 YARN_CACHE_FOLDER = "js/yarn"

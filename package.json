@@ -2,13 +2,12 @@
   "name": "winpassage",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.32.1",
   "type": "module",
   "scripts": {
-    "dev:admin": "pnpm --filter winpassage-admin tauri:dev",
-    "dev:client": "pnpm --filter winpassage-client tauri:dev",
-    "build:admin": "pnpm --filter winpassage-admin tauri:build",
-    "build:client": "pnpm --filter winpassage-client tauri:build",
+    "dev:admin": "aube run tauri:dev --filter winpassage-admin",
+    "dev:client": "aube run tauri:dev --filter winpassage-client",
+    "build:admin": "aube run tauri:build --filter winpassage-admin",
+    "build:client": "aube run tauri:build --filter winpassage-client",
     "build:server": "cargo build --release -p winpassage-server",
     "build:agentctl": "cargo build --release -p winpassage-agentctl",
     "fmt:rust": "cargo fmt --all",
@@ -16,7 +15,7 @@
     "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings",
     "test:rust": "cargo test --workspace",
     "check:rust": "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
-    "check:js": "pnpm --recursive run build"
+    "check:js": "aube run build --filter winpassage-admin && aube run build --filter winpassage-client"
   },
   "devDependencies": {
     "typescript": "^5.9.0"
@@ -29,11 +28,5 @@
   "bugs": {
     "url": "https://github.com/rozsazoltan/winpassage/issues"
   },
-  "homepage": "https://github.com/rozsazoltan/winpassage#readme",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "esbuild"
-    ]
-  }
+  "homepage": "https://github.com/rozsazoltan/winpassage#readme"
 }

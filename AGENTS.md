@@ -297,10 +297,10 @@ Shell/automation:
 Before finishing a change, run the relevant checks when the local environment supports them:
 
 ```bash
-pnpm fmt:rust:check
-pnpm lint:rust
-pnpm test:rust
-pnpm check:js
+aube run fmt:rust:check
+aube run lint:rust
+aube run test:rust
+aube run check:js
 ```
 
 Windows-specific behavior should be verified on Windows 11 Pro when possible:

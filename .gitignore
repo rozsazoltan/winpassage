@@ -15,7 +15,9 @@ Cargo.lock.bak
 
 # JavaScript
 node_modules/
-.pnpm-store/
+.aube/
+node_modules/.aube/
+
 
 # generated
 .cache/

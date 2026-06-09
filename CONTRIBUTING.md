@@ -20,12 +20,10 @@ Install the local toolchain:
 ```bash
 mise trust
 mise install
-corepack enable
-corepack prepare pnpm@10.32.1 --activate
-pnpm install
+aube install
 ```
 
-The repository assumes Rust stable, Node.js 22, pnpm 10, and the Verzly release toolchain in local development or GitHub Actions.
+The repository assumes Rust stable, Node.js 24, aube, and the Verzly release toolchain in local development or GitHub Actions.
 
 ## Workspace rules
 
@@ -50,12 +48,12 @@ The admin app may store local server profiles for multiple standalone WinPassage
 Root scripts:
 
 ```bash
-pnpm check:rust
-pnpm check:js
-pnpm build:server
-pnpm build:agentctl
-pnpm build:admin
-pnpm build:client
+aube run check:rust
+aube run check:js
+aube run build:server
+aube run build:agentctl
+aube run build:admin
+aube run build:client
 ```
 
 Run the server locally:
@@ -70,13 +68,13 @@ cargo run -p winpassage-server -- serve
 Run the admin app:
 
 ```bash
-pnpm dev:admin
+aube run dev:admin
 ```
 
 Run the client app:
 
 ```bash
-pnpm dev:client
+aube run dev:client
 ```
 
 ## Windows service setup
@@ -165,10 +163,10 @@ Development expectations:
 Run touched-area checks before opening a pull request:
 
 ```bash
-pnpm fmt:rust:check
-pnpm lint:rust
-pnpm test:rust
-pnpm check:js
+aube run fmt:rust:check
+aube run lint:rust
+aube run test:rust
+aube run check:js
 ```
 
 Windows-specific code should be tested on Windows 11 Pro because local user, service control, and mapped drive APIs cannot be fully validated on Linux CI.

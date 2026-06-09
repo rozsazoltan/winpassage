@@ -19,20 +19,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
 
-      - name: Set up pnpm
-        shell: bash
-        run: |
-          set -euo pipefail
-          corepack enable
-          corepack prepare pnpm@10.32.1 --activate
-          pnpm --version
-
-      - name: Install dependencies
-        shell: bash
-        run: pnpm install --no-frozen-lockfile
+      - name: Set up aube
+        uses: verzly/setup-aube@v1
+        with:
+          run_install: true
 
       - name: Build frontends
         shell: bash
-        run: pnpm check:js
+        run: aube run check:js
