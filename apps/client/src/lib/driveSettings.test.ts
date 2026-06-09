@@ -9,11 +9,25 @@ describe('client drive settings', () => {
   it('normalizes drive letters', () => {
     expect(normalizeDriveLetter('s')).toBe('S:');
     expect(normalizeDriveLetter('g:')).toBe('G:');
+    expect(normalizeDriveLetter('i:/')).toBe('I:');
   });
 
   it('drops invalid stored drive entries', () => {
-    expect(loadStoredDrives('[{"id":"1","letter":"S:","remote_path":"\\\\server\\share"},{"id":"2","letter":"","remote_path":"x"}]')).toEqual([
+    const stored = JSON.stringify([
+      { id: '1', letter: 'S:', remote_path: '\\\\server\\share' },
+      { id: '2', letter: '', remote_path: 'x' },
+      { id: '3', letter: 'T:', remote_path: '' },
+      { id: '4', letter: 'R:', remote_path: 42 },
+      { id: '', letter: 'U:', remote_path: '\\\\server\\empty-id' },
+      null,
+    ]);
+
+    expect(loadStoredDrives(stored)).toEqual([
       { id: '1', letter: 'S:', remote_path: '\\\\server\\share' },
     ]);
+  });
+
+  it('returns no drives for invalid JSON', () => {
+    expect(loadStoredDrives('[{"remote_path":"\\server\share"}]')).toEqual([]);
   });
 });

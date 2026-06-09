@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { computed, nextTick, reactive, ref } from 'vue';
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import { loadStoredDrives, normalizeDriveLetter } from './lib/driveSettings';
 import type {
   DriveMapping,
   DriveOperationResponse,
@@ -26,18 +27,10 @@ function normalizeServerUrl(value: string): string {
 }
 
 function loadDrives(): DriveConfig[] {
-  const stored = localStorage.getItem(DRIVES_STORAGE_KEY);
-  if (!stored) return [];
-
-  try {
-    const parsed = JSON.parse(stored) as DriveConfig[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((drive) => drive.letter?.trim() && drive.remote_path?.trim())
-      .map((drive) => ({ ...drive, id: drive.id || crypto.randomUUID(), busy: false }));
-  } catch {
-    return [];
-  }
+  return loadStoredDrives(localStorage.getItem(DRIVES_STORAGE_KEY)).map((drive) => ({
+    ...drive,
+    busy: false,
+  }));
 }
 
 const serverUrl = ref(localStorage.getItem(SERVER_STORAGE_KEY) ?? DEFAULT_SERVER_URL);
@@ -173,11 +166,6 @@ function saveConnectionSettings() {
   } catch {
     error.value = 'Invalid server address. Use an address such as http://192.168.1.10:4487.';
   }
-}
-
-function normalizeDriveLetter(value: string): string {
-  const trimmed = value.trim().replace(/\\+$/, '').replace(/\/+$/, '').replace(':', '').toUpperCase();
-  return trimmed ? `${trimmed}:` : '';
 }
 
 function addDrive() {
