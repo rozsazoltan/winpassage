@@ -12,6 +12,7 @@ It provides a Windows background agent, an admin desktop app, and a client deskt
   - [EU-oriented small network workflow](#eu-oriented-small-network-workflow)
   - [What it is not](#what-it-is-not)
 - [Get started](#get-started)
+  - [Quick install](#quick-install)
   - [Server machine](#server-machine)
   - [Multiple central machines](#multiple-central-machines)
   - [Admin app](#admin-app)
@@ -22,6 +23,7 @@ It provides a Windows background agent, an admin desktop app, and a client deskt
   - [Self-service password change](#self-service-password-change)
   - [Mapped drives](#mapped-drives)
   - [Audit log](#audit-log)
+  - [Updates](#updates)
   - [Connection limits](#connection-limits)
   - [Security model](#security-model)
 - [Configuration](#configuration)
@@ -104,6 +106,51 @@ Detailed deployment and service setup belongs in `CONTRIBUTING.md`. This README 
 
 > [!IMPORTANT]
 > Run the server agent only on trusted private networks. Do not expose the API directly to the public internet. Use VPN, firewall allowlists, and TLS/mTLS in production.
+
+### Quick install
+
+Download the latest Windows release assets from:
+
+```text
+https://github.com/rozsazoltan/winpassage/releases/latest
+```
+
+On the central Windows Pro machine, create the install directory and copy the service tools into it:
+
+```powershell
+New-Item -ItemType Directory -Force "C:\Program Files\WinPassage"
+
+Copy-Item .\winpassage-server.exe "C:\Program Files\WinPassage\"
+Copy-Item .\winpassage-agentctl.exe "C:\Program Files\WinPassage\"
+Copy-Item .\winpassage-updater.exe "C:\Program Files\WinPassage\"
+```
+
+Install and start the Windows Service from an elevated PowerShell:
+
+```powershell
+& "C:\Program Files\WinPassage\winpassage-agentctl.exe" install `
+  --server-bin "C:\Program Files\WinPassage\winpassage-server.exe"
+
+& "C:\Program Files\WinPassage\winpassage-agentctl.exe" start
+```
+
+Check that the agent is alive:
+
+```powershell
+Invoke-RestMethod http://CENTRAL-PC:4487/health
+```
+
+Install the desktop apps where needed:
+
+```text
+WinPassage Admin  -> administrator workstation
+WinPassage Client -> user workstations
+```
+
+Open **WinPassage Admin**, add the central machine by IP/DNS address, load users, and test with a disposable local Windows account first.
+
+> [!IMPORTANT]
+> Do not expose the WinPassage port to the public internet. Keep it on a trusted LAN/VPN and use a long random admin token.
 
 ### Server machine
 

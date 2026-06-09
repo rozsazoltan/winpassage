@@ -50,3 +50,9 @@ Before running privileged actions, the UI must make the active server visible en
 ## Client connection settings
 
 The client app should display the configured server address but keep editing behind an advanced confirmation flow. This reduces accidental misconfiguration for regular users and prevents support issues where password changes are sent to the wrong central machine.
+
+## Update security
+
+WinPassage updates must be sourced only from `https://github.com/rozsazoltan/winpassage` release assets and the matching GitHub releases API. The updater must reject custom mirrors, custom repositories, non-HTTPS URLs, and release asset URLs outside the official repository.
+
+Privileged server updates should be applied through the dedicated updater/service-control boundary, not directly by the user-facing Tauri apps.

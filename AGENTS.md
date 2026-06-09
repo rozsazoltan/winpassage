@@ -415,3 +415,14 @@ The table must communicate that data is loaded from Windows, not from a WinPassa
 ## Release workflow compatibility
 
 Use the Verzly release tools the same way the working release templates do: install `verzly/github-release@latest`, run `github-release prepare`, build artifacts from the generated release branch, and run `github-release finalize` with `--assets`. Do not call unsupported helper subcommands such as `github-release assert-head` unless the checked-in toolchain contract explicitly documents them. If a release branch commit must be verified, capture `git rev-parse HEAD` after `prepare` and compare that SHA with `git rev-parse HEAD` in build jobs.
+
+## Updater rules
+
+- Keep updates in the dedicated `winpassage-updater` crate.
+- Do not add configurable update hosts, mirrors, or repository owner/name settings.
+- The only accepted source is `https://github.com/rozsazoltan/winpassage` and the matching GitHub releases API.
+- Validate every URL before downloading or applying an update.
+- Do not make Tauri apps replace privileged service binaries directly. Use the updater/service-control boundary.
+- If release tooling changes, keep the workflow aligned with the Nutrino/toolchain pattern and the actual CLI contracts.
+- For `cargo-release`, use `build --config <file> --version <version> --target windows-x64`; do not add unsupported `--output`, `--windows-x64`, or `--verbose` flags.
+- For `tauri-release`, use `build --config <file> --platform windows`; do not add unsupported `--output`, `--windows`, or `--verbose` flags.

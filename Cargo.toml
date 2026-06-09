@@ -6,6 +6,7 @@ members = [
   "crates/winpassage-windows",
   "crates/winpassage-server",
   "crates/winpassage-agentctl",
+  "crates/winpassage-updater",
   "apps/admin/src-tauri",
   "apps/client/src-tauri",
 ]
@@ -36,5 +37,6 @@ tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"
 windows-service = "0.8"
 zeroize = "1"
