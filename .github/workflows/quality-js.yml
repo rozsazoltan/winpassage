@@ -8,6 +8,13 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
+  AUBE_NO_UPDATE_CHECK: "1"
+  AUBE_STORE_DIR: ${{ github.workspace }}\.cache\aube\store
+  AUBE_CACHE_DIR: ${{ github.workspace }}\.cache\aube\cache
+
 jobs:
   js:
     name: JavaScript and Tauri frontends
@@ -19,7 +26,31 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore aube store cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/aube
+          key: aube-store-quality-v2-${{ runner.os }}-${{ hashFiles('aube-workspace.yaml', '**/package.json') }}
+          restore-keys: |
+            aube-store-quality-v2-${{ runner.os }}-
+            aube-store-v2-${{ runner.os }}-
+
+      - name: Remove workspace node_modules
+        shell: pwsh
+        run: |
+          $paths = @(
+            "node_modules",
+            "apps/admin/node_modules",
+            "apps/client/node_modules"
+          )
+          foreach ($path in $paths) {
+            if (Test-Path $path) {
+              Remove-Item -Recurse -Force $path
+            }
+          }
 
       - name: Set up aube
         uses: verzly/setup-aube@v1

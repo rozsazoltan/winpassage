@@ -21,7 +21,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: "24"
+  AUBE_NO_UPDATE_CHECK: "1"
+  AUBE_STORE_DIR: ${{ github.workspace }}\.cache\aube\store
+  AUBE_CACHE_DIR: ${{ github.workspace }}\.cache\aube\cache
   RELEASE_ARTIFACT_DIR: dist/release-artifacts
   RELEASE_UPLOAD_DIR: dist/release-upload
 
@@ -119,6 +123,19 @@ jobs:
           rustup default stable
           rustup target add x86_64-pc-windows-msvc
 
+      - name: Restore Rust dependency cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/rust
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-release-service-${{ runner.os }}-${{ matrix.binary }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          restore-keys: |
+            rust-release-service-${{ runner.os }}-${{ matrix.binary }}-
+            rust-release-service-${{ runner.os }}-
+            rust-${{ runner.os }}-
+
       - name: Install cargo-release
         uses: verzly/cargo-release@latest
         with:
@@ -183,6 +200,32 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Restore aube store cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/aube
+          key: aube-store-release-tauri-v2-${{ runner.os }}-${{ matrix.app }}-${{ hashFiles('aube-workspace.yaml', '**/package.json') }}
+          restore-keys: |
+            aube-store-release-tauri-v2-${{ runner.os }}-${{ matrix.app }}-
+            aube-store-release-tauri-v2-${{ runner.os }}-
+            aube-store-quality-v2-${{ runner.os }}-
+            aube-store-v2-${{ runner.os }}-
+
+      - name: Remove workspace node_modules
+        shell: pwsh
+        run: |
+          $paths = @(
+            "node_modules",
+            "apps/admin/node_modules",
+            "apps/client/node_modules"
+          )
+          foreach ($path in $paths) {
+            if (Test-Path $path) {
+              Remove-Item -Recurse -Force $path
+            }
+          }
+
       - name: Set up aube
         uses: verzly/setup-aube@v1
         with:
@@ -195,6 +238,20 @@ jobs:
           rustup update stable
           rustup default stable
           rustup target add x86_64-pc-windows-msvc
+
+      - name: Restore Rust dependency cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/rust
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-release-tauri-${{ runner.os }}-${{ matrix.app }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          restore-keys: |
+            rust-release-tauri-${{ runner.os }}-${{ matrix.app }}-
+            rust-release-tauri-${{ runner.os }}-
+            rust-release-service-${{ runner.os }}-
+            rust-${{ runner.os }}-
 
       - name: Install tauri-release
         uses: verzly/tauri-release@latest

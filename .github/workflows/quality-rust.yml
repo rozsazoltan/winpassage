@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   rust:
     name: Rust strict quality
@@ -17,41 +20,34 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Rust
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = "Stop"
           rustup update stable
           rustup default stable
           rustc --version
           cargo --version
 
+      - name: Restore Rust dependency cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/rust
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-quality-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          restore-keys: |
+            rust-quality-${{ runner.os }}-
+            rust-${{ runner.os }}-
+
       - name: Install rust-cache
-        uses: verzly/rust-cache@v0
+        uses: verzly/rust-cache@latest
         with:
           install-only: true
 
-      - name: Format
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo fmt --all -- --check
-
-      - name: Check all targets
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo check --workspace --all-targets
-
-      - name: Clippy
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Unit and non-destructive integration tests
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo test --workspace --all-targets
-
-      - name: Documentation tests
-        shell: bash
-        run: rust-cache run --config rust-cache.toml -- cargo test --workspace --doc
-
-      - name: Rustdoc warnings
-        shell: bash
+      - name: Rust strict quality
+        shell: pwsh
         env:
           RUSTDOCFLAGS: "-D warnings"
-        run: rust-cache run --config rust-cache.toml -- cargo doc --workspace --no-deps
+        run: |
+          rust-cache run --config rust-cache.toml -- pwsh -NoLogo -NoProfile -NonInteractive -Command "& { `$ErrorActionPreference = 'Stop'; cargo fmt --all -- --check; cargo check --workspace --all-targets; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets; cargo test --workspace --doc; cargo doc --workspace --no-deps }"

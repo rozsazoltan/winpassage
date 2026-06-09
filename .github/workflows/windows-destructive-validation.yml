@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   destructive-windows:
     name: Destructive local account lifecycle validation
@@ -29,8 +32,21 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Restore Rust dependency cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/rust
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: rust-destructive-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          restore-keys: |
+            rust-destructive-${{ runner.os }}-
+            rust-quality-${{ runner.os }}-
+            rust-${{ runner.os }}-
+
       - name: Install rust-cache
-        uses: verzly/rust-cache@v0
+        uses: verzly/rust-cache@latest
         with:
           install-only: true
 
