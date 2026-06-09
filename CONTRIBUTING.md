@@ -194,3 +194,44 @@ The root `README.md` is user-facing and should stay focused on usage, deployment
 Development, setup, testing, and release instructions belong in this file.
 
 Do not add a README to every crate unless the crate is published or consumed separately.
+
+
+## Testing account lifecycle operations
+
+Use a disposable local Windows account before testing destructive operations.
+
+```powershell
+net user winpassage-test "OldPassword123!" /add
+```
+
+Run the server locally with an admin token:
+
+```powershell
+$env:WINPASSAGE_BIND = "127.0.0.1:4487"
+$env:WINPASSAGE_ADMIN_TOKEN = "dev-token"
+$env:WINPASSAGE_REQUIRE_TLS = "false"
+cargo run -p winpassage-server -- serve
+```
+
+Useful API smoke tests:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:4487/v1/users" `
+  -Headers @{ Authorization = "Bearer dev-token" }
+
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:4487/v1/sessions" `
+  -Headers @{ Authorization = "Bearer dev-token" }
+```
+
+Delete the disposable user after testing:
+
+```powershell
+net user winpassage-test /delete
+Get-CimInstance Win32_UserProfile |
+  Where-Object { $_.LocalPath -eq "C:\Users\winpassage-test" } |
+  Remove-CimInstance
+```
+
+Do not test account deletion, administrator revocation, or session logoff on your only administrator account.

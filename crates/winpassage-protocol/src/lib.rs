@@ -13,6 +13,8 @@ pub struct LocalUserSummary {
     pub full_name: Option<String>,
     pub disabled: bool,
     pub password_required: bool,
+    pub is_administrator: bool,
+    pub active_session_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,8 +23,42 @@ pub struct ListUsersResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateLocalUserRequest {
+    pub username: String,
+    pub full_name: Option<String>,
+    pub password: String,
+    pub must_change_password: bool,
+    pub enabled: bool,
+    pub admin: bool,
+    pub reason: Option<String>,
+    pub request_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteLocalUserRequest {
+    pub delete_profile: bool,
+    pub logoff_sessions: bool,
+    pub reason: Option<String>,
+    pub request_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResetPasswordRequest {
     pub new_password: String,
+    pub reason: Option<String>,
+    pub request_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetAccountEnabledRequest {
+    pub enabled: bool,
+    pub reason: Option<String>,
+    pub request_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetAdministratorRequest {
+    pub enabled: bool,
     pub reason: Option<String>,
     pub request_id: Option<Uuid>,
 }
@@ -36,15 +72,38 @@ pub struct ChangeOwnPasswordRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PasswordChangeResponse {
+pub struct ActionResponse {
     pub success: bool,
     pub message: String,
     pub request_id: Uuid,
 }
 
+pub type PasswordChangeResponse = ActionResponse;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiErrorResponse {
     pub error: String,
+    pub request_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalSessionSummary {
+    pub session_id: u32,
+    pub username: Option<String>,
+    pub domain: Option<String>,
+    pub state: String,
+    pub client_name: Option<String>,
+    pub is_console: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListSessionsResponse {
+    pub sessions: Vec<LocalSessionSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogoffSessionRequest {
+    pub reason: Option<String>,
     pub request_id: Option<Uuid>,
 }
 

@@ -28,3 +28,16 @@ Report vulnerabilities privately through the repository owner's preferred privat
 ## Security expectations
 
 A secure WinPassage deployment should use firewall allowlists, VPN or overlay networking, TLS/mTLS in front of the agent, endpoint protection, offline backups, and regular audit review.
+
+
+## Local administrator access
+
+WinPassage can grant or revoke membership in the local Administrators group. Treat this as a high-impact administrative action. The server must refuse to remove or delete the final local administrator account, and the UI must require explicit confirmation before destructive account lifecycle operations.
+
+## Windows sessions
+
+Session logoff can interrupt active work. Use it only for owner-approved offboarding, stale sessions, or recovery workflows. Audit entries must include the target session and the operator reason, but never any password value.
+
+## Profile deletion
+
+Account deletion and profile deletion are separate high-impact actions. Profile deletion uses Windows profile APIs and should be used only after active sessions are logged off and the operator has confirmed that local profile data is no longer required.

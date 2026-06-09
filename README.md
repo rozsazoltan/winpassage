@@ -345,6 +345,32 @@ WinPassage helps with audit-friendly password change workflows, but NIS2, ISO 27
 
 See: `CONTRIBUTING.md`.
 
+
+
+### Account lifecycle management
+
+WinPassage reads the current local Windows accounts from the central machine. It does not keep a separate user database and does not try to mirror Windows users into application storage.
+
+The admin console is designed to support these local Windows account operations:
+
+```text
+- list current local Windows users
+- create a local user
+- delete a local user
+- enable or disable a local user
+- reset a user's password as an administrator
+- grant or revoke local administrator access
+- list active Windows sessions
+- log off a selected session before offboarding or account deletion
+```
+
+> [!WARNING]
+> User creation, deletion, administrator grants, administrator revokes, and session logoff are privileged Windows operations. Use a dedicated test account first and keep the service reachable only from a trusted private network, VPN, or mTLS-protected admin channel.
+
+> [!IMPORTANT]
+> The local Administrators group is resolved through the built-in Administrators SID where possible. The UI should display administrator access as a capability, not as a localized group name.
+
+
 ## License & Acknowledgments
 
 WinPassage is released under the GNU Affero General Public License v3.0 only.

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use axum::extract::{ConnectInfo, Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -13,8 +13,10 @@ use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 use winpassage_core::{validate_local_username, AuditEvent, AuditResult, PasswordPolicy};
 use winpassage_protocol::{
-    ApiErrorResponse, ChangeOwnPasswordRequest, HealthResponse, ListUsersResponse,
-    PasswordChangeResponse, ResetPasswordRequest,
+    ActionResponse, ApiErrorResponse, ChangeOwnPasswordRequest, CreateLocalUserRequest,
+    DeleteLocalUserRequest, HealthResponse, ListSessionsResponse, ListUsersResponse,
+    LogoffSessionRequest, PasswordChangeResponse, ResetPasswordRequest, SetAccountEnabledRequest,
+    SetAdministratorRequest,
 };
 
 #[derive(Clone)]
@@ -44,6 +46,14 @@ impl ApiError {
             status: StatusCode::UNAUTHORIZED,
             message: message.into(),
             request_id: None,
+        }
+    }
+
+    fn conflict(message: impl Into<String>, request_id: Option<Uuid>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: message.into(),
+            request_id,
         }
     }
 
@@ -114,7 +124,6 @@ pub async fn serve_with_shutdown(
     Ok(())
 }
 
-
 fn validate_transport(config: &ServerConfig) -> Result<()> {
     if config.require_tls && !config.bind.ip().is_loopback() {
         anyhow::bail!(
@@ -128,11 +137,16 @@ fn validate_transport(config: &ServerConfig) -> Result<()> {
 fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
-        .route("/v1/users", get(list_users))
+        .route("/v1/users", get(list_users).post(create_user))
+        .route("/v1/users/{username}", delete(delete_user))
         .route(
-            "/v1/admin/users/{username}/password/reset",
+            "/v1/users/{username}/password/reset",
             post(reset_password),
         )
+        .route("/v1/users/{username}/enabled", post(set_user_enabled))
+        .route("/v1/users/{username}/admin", post(set_user_administrator))
+        .route("/v1/sessions", get(list_sessions))
+        .route("/v1/sessions/{session_id}/logoff", post(logoff_session))
         .route("/v1/me/password/change", post(change_own_password))
         .layer(TraceLayer::new_for_http())
         .layer(
@@ -163,6 +177,115 @@ async fn list_users(
     Ok(Json(ListUsersResponse { users }))
 }
 
+async fn create_user(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(request): Json<CreateLocalUserRequest>,
+) -> Result<Json<ActionResponse>, ApiError> {
+    require_admin(&state, &headers)?;
+    validate_local_username(&request.username)
+        .map_err(|error| ApiError::bad_request(error.to_string(), request.request_id))?;
+    password_policy(&state)
+        .validate(&request.password)
+        .map_err(|error| ApiError::bad_request(error.to_string(), request.request_id))?;
+
+    let request_id = request.request_id.unwrap_or_else(Uuid::new_v4);
+    let result = (|| -> anyhow::Result<()> {
+        winpassage_windows::create_local_user(
+            &request.username,
+            request.full_name.as_deref(),
+            &request.password,
+            request.must_change_password,
+            request.enabled,
+        )?;
+
+        if request.admin {
+            winpassage_windows::grant_local_administrator(&request.username)?;
+        }
+
+        Ok(())
+    })();
+
+    audit_admin_action(
+        &state,
+        addr,
+        "admin_user_create",
+        &request.username,
+        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        request.reason,
+        request_id,
+    );
+
+    result.map_err(|error| ApiError::internal(error.to_string(), Some(request_id)))?;
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "local user created".to_string(),
+        request_id,
+    }))
+}
+
+async fn delete_user(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(username): Path<String>,
+    Json(request): Json<DeleteLocalUserRequest>,
+) -> Result<Json<ActionResponse>, ApiError> {
+    require_admin(&state, &headers)?;
+    validate_local_username(&username)
+        .map_err(|error| ApiError::bad_request(error.to_string(), request.request_id))?;
+
+    let request_id = request.request_id.unwrap_or_else(Uuid::new_v4);
+    let result = (|| -> anyhow::Result<()> {
+        if request.logoff_sessions {
+            for session in winpassage_windows::list_sessions()? {
+                if session
+                    .username
+                    .as_deref()
+                    .is_some_and(|value| value.eq_ignore_ascii_case(&username))
+                {
+                    winpassage_windows::logoff_session(session.session_id)?;
+                }
+            }
+        }
+
+        if winpassage_windows::is_local_administrator(&username).unwrap_or(false)
+            && winpassage_windows::local_administrator_count().unwrap_or(0) <= 1
+        {
+            anyhow::bail!("refusing to delete the last local administrator account");
+        }
+
+        if request.delete_profile {
+            winpassage_windows::delete_local_user_profile(&username)?;
+        }
+
+        winpassage_windows::delete_local_user(&username)?;
+
+        Ok(())
+    })();
+
+    let status = result.as_ref().map(|_| ()).map_err(|error| error.to_string());
+    audit_admin_action(
+        &state,
+        addr,
+        "admin_user_delete",
+        &username,
+        status,
+        request.reason,
+        request_id,
+    );
+
+    result.map_err(|error| ApiError::conflict(error.to_string(), Some(request_id)))?;
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "local user deleted".to_string(),
+        request_id,
+    }))
+}
+
 async fn reset_password(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -180,27 +303,142 @@ async fn reset_password(
     let request_id = request.request_id.unwrap_or_else(Uuid::new_v4);
     let result = winpassage_windows::reset_local_user_password(&username, &request.new_password);
 
-    let mut audit = AuditEvent::new(
+    audit_admin_action(
+        &state,
+        addr,
         "admin_password_reset",
-        "admin",
-        username.clone(),
-        if result.is_ok() {
-            AuditResult::Success
-        } else {
-            AuditResult::Failure
-        },
+        &username,
+        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        request.reason,
         request_id,
     );
-    audit.source_ip = Some(addr.ip().to_string());
-    audit.reason = request.reason;
-    audit.message = result.as_ref().err().map(|error| error.to_string());
-    state.audit.write(audit);
 
     result.map_err(|error| ApiError::internal(error.to_string(), Some(request_id)))?;
 
     Ok(Json(PasswordChangeResponse {
         success: true,
         message: "password reset completed".to_string(),
+        request_id,
+    }))
+}
+
+async fn set_user_enabled(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(username): Path<String>,
+    Json(request): Json<SetAccountEnabledRequest>,
+) -> Result<Json<ActionResponse>, ApiError> {
+    require_admin(&state, &headers)?;
+    validate_local_username(&username)
+        .map_err(|error| ApiError::bad_request(error.to_string(), request.request_id))?;
+
+    let request_id = request.request_id.unwrap_or_else(Uuid::new_v4);
+    let result = winpassage_windows::set_local_user_enabled(&username, request.enabled);
+
+    audit_admin_action(
+        &state,
+        addr,
+        if request.enabled { "admin_user_enable" } else { "admin_user_disable" },
+        &username,
+        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        request.reason,
+        request_id,
+    );
+
+    result.map_err(|error| ApiError::internal(error.to_string(), Some(request_id)))?;
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: if request.enabled {
+            "local user enabled".to_string()
+        } else {
+            "local user disabled".to_string()
+        },
+        request_id,
+    }))
+}
+
+async fn set_user_administrator(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(username): Path<String>,
+    Json(request): Json<SetAdministratorRequest>,
+) -> Result<Json<ActionResponse>, ApiError> {
+    require_admin(&state, &headers)?;
+    validate_local_username(&username)
+        .map_err(|error| ApiError::bad_request(error.to_string(), request.request_id))?;
+
+    let request_id = request.request_id.unwrap_or_else(Uuid::new_v4);
+    let result = if request.enabled {
+        winpassage_windows::grant_local_administrator(&username)
+    } else {
+        winpassage_windows::revoke_local_administrator(&username)
+    };
+
+    audit_admin_action(
+        &state,
+        addr,
+        if request.enabled { "admin_grant" } else { "admin_revoke" },
+        &username,
+        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        request.reason,
+        request_id,
+    );
+
+    result.map_err(|error| ApiError::conflict(error.to_string(), Some(request_id)))?;
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: if request.enabled {
+            "administrator access granted".to_string()
+        } else {
+            "administrator access revoked".to_string()
+        },
+        request_id,
+    }))
+}
+
+async fn list_sessions(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<ListSessionsResponse>, ApiError> {
+    require_admin(&state, &headers)?;
+
+    let sessions = winpassage_windows::list_sessions()
+        .map_err(|error| ApiError::internal(error.to_string(), None))?;
+
+    Ok(Json(ListSessionsResponse { sessions }))
+}
+
+async fn logoff_session(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(session_id): Path<u32>,
+    Json(request): Json<LogoffSessionRequest>,
+) -> Result<Json<ActionResponse>, ApiError> {
+    require_admin(&state, &headers)?;
+
+    let request_id = request.request_id.unwrap_or_else(Uuid::new_v4);
+    let result = winpassage_windows::logoff_session(session_id);
+
+    audit_admin_action(
+        &state,
+        addr,
+        "admin_session_logoff",
+        &format!("session:{session_id}"),
+        result.as_ref().map(|_| ()).map_err(|error| error.to_string()),
+        request.reason,
+        request_id,
+    );
+
+    result.map_err(|error| ApiError::conflict(error.to_string(), Some(request_id)))?;
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "session logoff requested".to_string(),
         request_id,
     }))
 }
@@ -245,6 +483,32 @@ async fn change_own_password(
         message: "password change completed".to_string(),
         request_id,
     }))
+}
+
+fn audit_admin_action(
+    state: &AppState,
+    addr: SocketAddr,
+    event: &str,
+    subject: &str,
+    result: std::result::Result<(), String>,
+    reason: Option<String>,
+    request_id: Uuid,
+) {
+    let mut audit = AuditEvent::new(
+        event,
+        "admin",
+        subject.to_string(),
+        if result.is_ok() {
+            AuditResult::Success
+        } else {
+            AuditResult::Failure
+        },
+        request_id,
+    );
+    audit.source_ip = Some(addr.ip().to_string());
+    audit.reason = reason;
+    audit.message = result.err();
+    state.audit.write(audit);
 }
 
 fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {

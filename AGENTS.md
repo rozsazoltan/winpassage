@@ -320,3 +320,49 @@ Do not turn this repository into:
 - a general-purpose Windows management agent.
 
 Keep WinPassage focused: small-network Windows password self-service, admin recovery reset, mapped-drive refresh, and audit-friendly operation.
+
+
+## Account lifecycle rules
+
+AI agents must preserve the central architectural rule: WinPassage does not own user records. Windows local accounts are the source of truth. Application state may store configuration, audit events, replay protection metadata, and UI preferences only.
+
+When changing account lifecycle behavior, keep these boundaries:
+
+```text
+crates/winpassage-windows/src/local_users.rs
+  Owns local account enumeration, creation, deletion, enable/disable, password reset, and self-service password change wrappers.
+
+crates/winpassage-windows/src/local_groups.rs
+  Owns local Administrators membership checks and grant/revoke behavior. Resolve the built-in Administrators group through SID S-1-5-32-544 where possible instead of hard-coding a localized group name.
+
+crates/winpassage-windows/src/sessions.rs
+  Owns Windows session enumeration and logoff behavior.
+
+crates/winpassage-protocol/src/lib.rs
+  Owns API DTOs. Keep field names stable and snake_case for JSON compatibility.
+
+crates/winpassage-server/src/http.rs
+  Owns route wiring, request validation, audit event emission, and admin authorization.
+```
+
+Never add a database table or JSON file that mirrors the Windows user list. If a UI needs users, call `/v1/users`. If it needs sessions, call `/v1/sessions`.
+
+Dangerous operations require all of the following:
+
+```text
+- admin authorization
+- request_id support
+- audit event with no passwords
+- target username/session in the subject field
+- meaningful error mapping
+- guardrails for last-administrator removal or deletion
+- UI confirmation for destructive operations
+```
+
+Password values must never be logged, returned, embedded in URLs, included in panic messages, or stored in application settings.
+
+## Admin UI rules for lifecycle features
+
+The admin UI should make real Windows-side effects visible. User deletion, administrator revocation, password reset, and session logoff must be visually separated from low-risk actions. Use warning/danger panels, exact username confirmation where destructive, and an audit reason field close to the action.
+
+The table must communicate that data is loaded from Windows, not from a WinPassage database. Administrator status is a capability badge, not a localized Windows group label.
