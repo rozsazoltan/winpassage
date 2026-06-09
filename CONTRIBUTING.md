@@ -119,9 +119,9 @@ $env:WINPASSAGE_AUDIT_LOG = "C:\ProgramData\WinPassage\audit.jsonl"
 
 ## CI cache behavior
 
-Rust Quality uses a single `rust-cache run` wrapper around the full strict Rust command sequence. This keeps the `.cache` target directory available across the check, clippy, test, doctest, and rustdoc phases inside the same job, and avoids repeated cache restore/save overhead between individual cargo steps.
+Rust Quality uses a single `rust-cache run` wrapper around the full strict Rust command sequence. The workflow runs on `windows-latest`, so the wrapper must execute the cargo sequence through PowerShell/`pwsh`, not `bash -lc`. Calling `bash` from inside `rust-cache run` can resolve to WSL on GitHub-hosted Windows runners and fail when no WSL distribution is installed.
 
-Do not split the Rust quality workflow back into several independent `rust-cache run` steps unless the cache toolchain contract changes. Separate cargo commands are easier to read, but they make the Windows job noticeably slower.
+Keep the `.cache` target directory shared across the check, clippy, test, doctest, and rustdoc phases inside the same job. Do not split the Rust quality workflow back into several independent `rust-cache run` steps unless the cache toolchain contract changes or there is measured evidence that separate steps are faster.
 
 ## Release workflow
 

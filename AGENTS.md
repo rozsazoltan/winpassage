@@ -440,4 +440,4 @@ Server demotion must remove only the WinPassage service and optionally copied Wi
 
 ### Rust Quality cache rule
 
-Keep the PR Rust Quality workflow cache-friendly. The workflow should install `verzly/rust-cache` once and run the strict Rust sequence inside one `rust-cache run --config rust-cache.toml -- bash -lc ...` invocation. Do not reintroduce separate `rust-cache run` steps for format, check, clippy, tests, doctests, and docs unless there is a clear measured reason. The `.cache` target directory must stay shared across those commands in the same job.
+Keep the PR Rust Quality workflow cache-friendly and Windows-native. The workflow should install `verzly/rust-cache` once and run the strict Rust sequence inside one `rust-cache run --config rust-cache.toml -- pwsh ...` invocation. Do not use `bash -lc` inside `rust-cache run` on `windows-latest`, because it can resolve to WSL and fail when no WSL distribution is installed. Do not reintroduce separate `rust-cache run` steps for format, check, clippy, tests, doctests, and docs unless there is a clear measured reason. The `.cache` target directory must stay shared across those commands in the same job.
