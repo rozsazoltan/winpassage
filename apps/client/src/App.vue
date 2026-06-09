@@ -6,7 +6,7 @@ import 'driver.js/dist/driver.css';
 import { winPassageMarkSvg } from './brand';
 import { lucideSvg, type IconName } from './icons';
 import { loadStoredDrives, normalizeDriveLetter } from './lib/driveSettings';
-import type { DriveMapping, DriveOperationResponse, PasswordChangeResponse, ReconnectMappedDrivesResponse } from './types';
+import type { DriveMapping, DriveOperationResponse, PasswordChangeResponse, ReconnectMappedDrivesResponse, UpdateStatus } from './types';
 
 type ClientTab = 'overview' | 'password' | 'drives' | 'settings';
 type ThemeMode = 'light' | 'system' | 'dark';
@@ -67,6 +67,11 @@ const setupOpen = ref(localStorage.getItem(SETUP_KEY) !== 'true');
 const tourCompleted = ref(localStorage.getItem(TOUR_KEY) === 'true');
 const driveEditorOpen = ref(false);
 const editingDriveId = ref<string | null>(null);
+const mountCredentialsOpen = ref(false);
+const connectionModalOpen = ref(false);
+const aboutOpen = ref(false);
+const updateStatus = ref<UpdateStatus | null>(null);
+const updateLoading = ref(false);
 
 const drives = reactive<DriveConfig[]>(loadDrives());
 const driveFormName = ref('');
@@ -270,6 +275,20 @@ async function unmountDrive(drive: DriveConfig) {
   }
 }
 
+async function checkUpdates() {
+  updateLoading.value = true;
+  message.value = '';
+  error.value = '';
+  try {
+    updateStatus.value = await invoke<UpdateStatus>('check_for_updates');
+    message.value = updateStatus.value.message;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  } finally {
+    updateLoading.value = false;
+  }
+}
+
 async function changePassword() {
   loading.value = true;
   message.value = '';
@@ -462,13 +481,12 @@ onMounted(() => {
             </div>
           </article>
 
-          <details class="advanced">
-            <summary>Mount credentials</summary>
-            <div class="form-grid">
-              <p class="muted">Optional. If empty, the current session password is used when available.</p>
-              <label>Drive password<input v-model="drivePassword" type="password" autocomplete="current-password" /></label>
+          <article class="surface-card compact-card">
+            <div class="card-title-row">
+              <div><h2>Mount credentials</h2><p>Optional password used only for drive mount actions.</p></div>
+              <button class="btn-secondary" @click="mountCredentialsOpen = true">Set password</button>
             </div>
-          </details>
+          </article>
         </section>
 
         <section v-if="activeTab === 'settings'" id="client-settings" class="page-grid two">
@@ -484,18 +502,23 @@ onMounted(() => {
           <article class="surface-card">
             <h2>Server connection</h2>
             <p class="muted">Change only when an administrator gives you a new IP:port.</p>
-            <div v-if="!connectionSettingsOpen" class="button-row between"><strong>{{ serverUrl }}</strong><button class="btn-secondary" @click="openConnectionSettings">Advanced edit</button></div>
-            <div v-else class="form-grid">
-              <label>Type CHANGE SERVER<input v-model="connectionUnlockInput" placeholder="CHANGE SERVER" /></label>
-              <label>Server URL<input v-model="pendingServerUrl" :disabled="!canEditConnection" /></label>
-              <div class="button-row"><button class="btn-primary" :disabled="!canEditConnection" @click="saveConnectionSettings">Save</button><button class="btn-secondary" @click="connectionSettingsOpen = false">Cancel</button></div>
-            </div>
+            <div class="button-row between tight"><strong>{{ serverUrl }}</strong><button class="btn-secondary" @click="openConnectionSettings(); connectionModalOpen = true">Advanced edit</button></div>
           </article>
 
           <article class="surface-card">
-            <h2>Guided tour</h2>
-            <p class="muted">Replay onboarding at any time.</p>
-            <button class="btn-secondary" @click="startClientTour(true)">Replay tour</button>
+            <h2>Updates</h2>
+            <p class="muted">Checks the official WinPassage GitHub release.</p>
+            <p v-if="updateStatus" class="mini-status">{{ updateStatus.message }}</p>
+            <button class="btn-secondary" :disabled="updateLoading" @click="checkUpdates">Check updates</button>
+          </article>
+
+          <article class="surface-card">
+            <h2>About</h2>
+            <p class="muted">Self-service password changes for small Windows Pro networks.</p>
+            <div class="button-row tight">
+              <button class="btn-secondary" @click="aboutOpen = true">About WinPassage</button>
+              <button class="btn-secondary" @click="startClientTour(true)">Replay tour</button>
+            </div>
           </article>
         </section>
       </section>
@@ -515,5 +538,38 @@ onMounted(() => {
         <div class="button-row end"><button class="btn-secondary" @click="closeDriveEditor">Cancel</button><button class="btn-primary" :disabled="!canSaveDrive" @click="saveDrive">Save drive</button></div>
       </aside>
     </section>
+
+    <section v-if="mountCredentialsOpen" class="drawer-backdrop" @click.self="mountCredentialsOpen = false">
+      <aside class="modal-card" role="dialog" aria-modal="true">
+        <div class="card-title-row"><div><h2>Mount credentials</h2><p>Used for individual Mount actions.</p></div><button class="icon-btn" @click="mountCredentialsOpen = false"><span v-html="icon('x')"></span></button></div>
+        <label>Drive password<input v-model="drivePassword" type="password" autocomplete="current-password" /></label>
+        <p class="muted">Leave empty to use the current or new password when available.</p>
+        <div class="button-row end"><button class="btn-primary" @click="mountCredentialsOpen = false">Done</button></div>
+      </aside>
+    </section>
+
+    <section v-if="connectionModalOpen" class="drawer-backdrop" @click.self="connectionModalOpen = false">
+      <aside class="modal-card" role="dialog" aria-modal="true">
+        <div class="card-title-row"><div><h2>Server connection</h2><p>Change only when support gives you a new IP:port.</p></div><button class="icon-btn" @click="connectionModalOpen = false"><span v-html="icon('x')"></span></button></div>
+        <div class="form-grid">
+          <label>Type CHANGE SERVER<input v-model="connectionUnlockInput" placeholder="CHANGE SERVER" /></label>
+          <label>Server URL<input v-model="pendingServerUrl" :disabled="!canEditConnection" placeholder="http://192.168.1.10:4487" /></label>
+        </div>
+        <div class="button-row end"><button class="btn-secondary" @click="connectionModalOpen = false">Cancel</button><button class="btn-primary" :disabled="!canEditConnection" @click="saveConnectionSettings(); connectionModalOpen = false">Save</button></div>
+      </aside>
+    </section>
+
+    <section v-if="aboutOpen" class="drawer-backdrop" @click.self="aboutOpen = false">
+      <aside class="modal-card about-modal" role="dialog" aria-modal="true">
+        <div class="card-title-row"><div><h2>About WinPassage</h2><p>A secure bridge for small Windows Pro networks.</p></div><button class="icon-btn" @click="aboutOpen = false"><span v-html="icon('x')"></span></button></div>
+        <div class="about-grid">
+          <section><h3>What it is</h3><p>WinPassage lets users change their own Windows password and keep configured network drives aligned with that password.</p></section>
+          <section><h3>What it is not</h3><p>It is not Active Directory, not an identity provider, and not a compliance guarantee by itself.</p></section>
+          <section><h3>Updates</h3><p>Update checks use only the official github.com/rozsazoltan/winpassage release source.</p></section>
+        </div>
+        <div class="button-row end"><button class="btn-primary" @click="aboutOpen = false">Close</button></div>
+      </aside>
+    </section>
+
   </main>
 </template>

@@ -1,5 +1,8 @@
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use serde::Deserialize;
+use std::path::PathBuf;
+use std::process::Command as ProcessCommand;
 use url::Url;
 
 const OWNER: &str = "rozsazoltan";
@@ -23,6 +26,13 @@ enum Command {
     Plan {
         #[arg(long, default_value = "latest")]
         version: String,
+    },
+    /// Check the official GitHub release metadata.
+    Check,
+    /// Boot-time boundary: check updates, then start the local service.
+    Bootstrap {
+        #[arg(long, default_value = r"C:\Program Files\WinPassage")]
+        install_dir: String,
     },
     /// Verify whether a URL is accepted by the updater source policy.
     VerifyUrl { url: String },
@@ -56,6 +66,18 @@ fn main() -> Result<()> {
             assert_allowed_update_url(&endpoint)?;
             println!("{endpoint}");
         }
+        Command::Check => {
+            let release = fetch_latest_release()?;
+            println!("latest: {}", release.tag_name);
+            if let Some(url) = release.html_url {
+                println!("release: {url}");
+            }
+        }
+        Command::Bootstrap { install_dir } => {
+            let release = fetch_latest_release()?;
+            println!("checked official release: {}", release.tag_name);
+            start_local_service(PathBuf::from(install_dir))?;
+        }
         Command::VerifyUrl { url } => {
             assert_allowed_update_url(&url)?;
             println!("accepted");
@@ -65,6 +87,45 @@ fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubRelease {
+    tag_name: String,
+    html_url: Option<String>,
+}
+
+fn fetch_latest_release() -> Result<GithubRelease> {
+    let endpoint = release_metadata_url("latest");
+    assert_allowed_update_url(&endpoint)?;
+
+    reqwest::blocking::Client::builder()
+        .user_agent("WinPassageUpdater")
+        .build()?
+        .get(endpoint)
+        .send()?
+        .error_for_status()?
+        .json::<GithubRelease>()
+        .context("failed to parse GitHub release metadata")
+}
+
+fn start_local_service(install_dir: PathBuf) -> Result<()> {
+    let agentctl = install_dir.join("winpassage-agentctl.exe");
+    if !agentctl.exists() {
+        bail!("winpassage-agentctl.exe was not found in {}", install_dir.display());
+    }
+
+    let output = ProcessCommand::new(&agentctl).arg("start").output()?;
+    if !output.status.success() {
+        bail!(
+            "failed to start WinPassage service: {}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
+    }
+
+    println!("WinPassage service started");
     Ok(())
 }
 
@@ -152,7 +213,6 @@ mod tests {
         )
         .expect("official release metadata should be accepted");
     }
-
 
     #[test]
     fn expected_asset_names_match_release_outputs() {

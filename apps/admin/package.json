@@ -1,32 +1,32 @@
 {
+  "name": "winpassage-admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:build": "tauri build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@tauri-apps/api": "catalog:",
     "@tauri-apps/plugin-opener": "catalog:",
-    "driver.js": "catalog:",
-    "vue": "catalog:"
+    "vue": "catalog:",
+    "driver.js": "catalog:"
   },
   "devDependencies": {
     "@tauri-apps/cli": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:",
-    "vue-tsc": "catalog:"
+    "vue-tsc": "catalog:",
+    "vitest": "catalog:"
   },
-  "license": "AGPL-3.0-only",
-  "name": "winpassage-admin",
-  "private": true,
-  "scripts": {
-    "build": "vue-tsc --noEmit && vite build",
-    "dev": "vite --host 127.0.0.1 --port 1420",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:build": "tauri build",
-    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "vue-tsc --noEmit"
-  },
-  "type": "module",
-  "version": "0.4.0"
+  "license": "AGPL-3.0-only"
 }
