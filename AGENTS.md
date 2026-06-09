@@ -258,6 +258,7 @@ Shell/automation:
 - Do not require global package installs when workspace scripts can be used.
 - Keep generated files out of version control.
 - Quality workflows must be PR-first: use `pull_request` targeting `master` plus optional `workflow_dispatch`, but do not add `push` triggers for `master` unless the repository policy changes.
+- Release workflows must configure a local Git author before invoking `github-release prepare` or `github-release finalize`; otherwise release commits and tags can fail on GitHub-hosted runners with `Author identity unknown`.
 - Release and destructive Windows validation workflows must stay manual.
 
 ## Typical change patterns
