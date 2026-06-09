@@ -252,7 +252,7 @@ The demotion flow removes only the WinPassage service and optionally the copied 
 cargo-release build --config <config> --version <release-version> --target windows-x64
 ```
 
-Do not rely on the cargo-release default version. Without `--version`, service artifacts are named with the `dev` placeholder, for example `winpassage-server-vdev-windows-x64.exe`, even when the GitHub Release itself is `vX.Y.Z`.
+Do not rely on the cargo-release default version. Without `--version`, service artifacts are named with the `dev` placeholder, for example `winpassage-server-dev-windows-x64.exe`, even when the GitHub Release itself is `vX.Y.Z`.
 
 Failed release branch cleanup should use `github-release cleanup` after a successful prepare step. Do not add prepare-before-cleanup behavior unless the release process intentionally diverges from the Nutrino-style flow.
 
@@ -274,3 +274,16 @@ The workflow deletes the GitHub Release and the matching tag. Prefer publishing 
 The desktop apps are named `WinPassageAdmin` and `WinPassageClient` without spaces so installers, app directories, and artifacts remain predictable. Both apps may be installed on the same Windows computer.
 
 First-run setup must complete before the `driver.js` guide starts. Keep the guide short and focused on the next operational action.
+
+
+## Release artifact naming
+
+Git tags and GitHub Releases use a leading `v`, for example `v0.2.0`. Release asset filenames do not use a leading `v` in the version segment. Service binaries should be named like `winpassage-server-0.2.0-windows-x64.exe`. Tauri installers follow Tauri bundle naming, for example `WinPassageAdmin_0.2.0_x64_en-US.msi`.
+
+Tauri release artifact globs must be product-specific. Do not use broad `bundle/**/*.exe` or `bundle/**/*.msi` globs, because cached target directories may contain stale bundle outputs from previous product names. Clean bundle output directories before Tauri release builds.
+
+## UI design implementation notes
+
+WinPassage uses a local, dependency-free SVG icon helper inspired by the Nutrino icon pack pattern. App UI icons live in `apps/admin/src/icons.ts` and `apps/client/src/icons.ts`; the product bridge-lock mark lives in `apps/*/src/brand.ts` and is rendered inline as SVG.
+
+The UI intentionally follows a compact professional desktop style: light/dark modes, concise cards, short labels, predictable tables, and settings-first controls. Keep future changes visually restrained and avoid adding default drive mappings or overloaded dashboards.
