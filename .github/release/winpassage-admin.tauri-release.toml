@@ -17,12 +17,8 @@ enabled = true
 strategy = "host"
 command = "aube run tauri:build --filter winpassage-admin"
 artifacts = [
-  ".cache/rust/packages/winpassage/target/release/bundle/**/*.msi",
-  ".cache/rust/packages/winpassage/target/release/bundle/**/*.exe",
-  ".cache/rust/packages/winpassage/target/release/bundle/**/*.zip",
-  "apps/admin/src-tauri/target/release/bundle/**/*.msi",
-  "apps/admin/src-tauri/target/release/bundle/**/*.exe",
-  "apps/admin/src-tauri/target/release/bundle/**/*.zip",
+  ".cache/rust/packages/winpassage/target/release/bundle/nsis/WinPassageAdmin_*_x64-setup.exe",
+  ".cache/rust/packages/winpassage/target/release/bundle/msi/WinPassageAdmin_*_x64_en-US.msi",
 ]
 
 [platforms.linux]

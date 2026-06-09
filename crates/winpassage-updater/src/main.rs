@@ -82,18 +82,14 @@ fn release_metadata_url(version: &str) -> String {
 }
 
 fn expected_asset_name(version: &str, component: Component) -> String {
-    let tag = if version.starts_with('v') {
-        version.to_owned()
-    } else {
-        format!("v{version}")
-    };
+    let clean_version = version.strip_prefix('v').unwrap_or(version);
 
     match component {
-        Component::Server => format!("winpassage-server-{tag}-windows-x64.exe"),
-        Component::Agentctl => format!("winpassage-agentctl-{tag}-windows-x64.exe"),
-        Component::Updater => format!("winpassage-updater-{tag}-windows-x64.exe"),
-        Component::Admin => format!("winpassage-admin-{tag}-windows-x64.msi"),
-        Component::Client => format!("winpassage-client-{tag}-windows-x64.msi"),
+        Component::Server => format!("winpassage-server-{clean_version}-windows-x64.exe"),
+        Component::Agentctl => format!("winpassage-agentctl-{clean_version}-windows-x64.exe"),
+        Component::Updater => format!("winpassage-updater-{clean_version}-windows-x64.exe"),
+        Component::Admin => format!("WinPassageAdmin_{clean_version}_x64_en-US.msi"),
+        Component::Client => format!("WinPassageClient_{clean_version}_x64_en-US.msi"),
     }
 }
 
@@ -144,7 +140,7 @@ mod tests {
     #[test]
     fn accepts_official_release_asset_urls() {
         assert_allowed_update_url(
-            "https://github.com/rozsazoltan/winpassage/releases/download/v0.1.0/winpassage-server-v0.1.0-windows-x64.exe",
+            "https://github.com/rozsazoltan/winpassage/releases/download/v0.1.0/winpassage-server-0.1.0-windows-x64.exe",
         )
         .expect("official release asset should be accepted");
     }
@@ -155,6 +151,27 @@ mod tests {
             "https://api.github.com/repos/rozsazoltan/winpassage/releases/latest",
         )
         .expect("official release metadata should be accepted");
+    }
+
+
+    #[test]
+    fn expected_asset_names_match_release_outputs() {
+        assert_eq!(
+            expected_asset_name("0.2.0", Component::Server),
+            "winpassage-server-0.2.0-windows-x64.exe"
+        );
+        assert_eq!(
+            expected_asset_name("v0.2.0", Component::Agentctl),
+            "winpassage-agentctl-0.2.0-windows-x64.exe"
+        );
+        assert_eq!(
+            expected_asset_name("0.2.0", Component::Admin),
+            "WinPassageAdmin_0.2.0_x64_en-US.msi"
+        );
+        assert_eq!(
+            expected_asset_name("v0.2.0", Component::Client),
+            "WinPassageClient_0.2.0_x64_en-US.msi"
+        );
     }
 
     #[test]

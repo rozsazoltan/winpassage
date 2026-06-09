@@ -468,7 +468,7 @@ Use Node.js 24 for every GitHub Actions job that runs aube, frontend checks, or 
 cargo-release build --config <config> --version <release-version> --target windows-x64
 ```
 
-Do not rely on the cargo-release default version. Without `--version`, service artifacts are named with the `dev` placeholder, for example `winpassage-server-vdev-windows-x64.exe`, even when the GitHub Release itself is `vX.Y.Z`.
+Do not rely on the cargo-release default version. Without `--version`, service artifacts are named with the `dev` placeholder, for example `winpassage-server-dev-windows-x64.exe`, even when the GitHub Release itself is `vX.Y.Z`.
 
 Failed release branch cleanup should use `github-release cleanup` after a successful prepare step. Do not add prepare-before-cleanup behavior unless the release process intentionally diverges from the Nutrino-style flow.
 
@@ -485,3 +485,18 @@ Failed release branch cleanup should use `github-release cleanup` after a succes
 - App onboarding uses `driver.js`; run initial setup before starting the tour.
 - Icons must represent a Windows Pro bridge/gateway concept. Do not use `WP` lettermark icons.
 - Release rollback belongs in the manual `Delete Release` workflow. It must require explicit `DELETE X.Y.Z` confirmation and delete both the GitHub Release and matching tag.
+
+
+## Release artifact guardrails
+
+Git tags use a leading `v`; release asset filenames should not. Keep service binary cargo-release templates in the form `winpassage-server-{version}-{target}{ext}`. Do not reintroduce `v{version}` into service asset names.
+
+Tauri release artifact globs must remain product-specific. Use `WinPassageAdmin_*` and `WinPassageClient_*` globs instead of broad `bundle/**/*.exe` or `bundle/**/*.msi` patterns. Broad bundle globs can publish stale installer files from cached target directories after product name changes.
+
+## v27 design system rules
+
+WinPassage UI uses a restrained professional desktop design system. Keep surfaces calm, compact, and predictable. Prefer small cards, clear tables, short copy, and a Settings-oriented layout over large marketing dashboards. Avoid oversized widgets, excessive gradients, AI-looking hero blocks, emoji, and decorative noise.
+
+Use the local Nutrino-style icon pack in `apps/*/src/icons.ts` through `lucideSvg(...)`. Do not add a runtime icon dependency unless there is a strong reason. Use `apps/*/src/brand.ts` for the bridge-lock SVG mark inside the app. Do not reintroduce `WP` lettermark branding.
+
+Both apps support Light, System, and Dark theme modes through `document.documentElement.dataset.theme`. Keep new components theme-token based; do not hardcode one-off light-only colors.

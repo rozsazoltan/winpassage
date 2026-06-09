@@ -10,7 +10,7 @@ container_engine = "podman"
 [artifacts]
 checksum = true
 manifest = true
-name_template = "winpassage-agentctl-v{version}-{target}{ext}"
+name_template = "winpassage-agentctl-{version}-{target}{ext}"
 
 [targets.windows-x64]
 enabled = true

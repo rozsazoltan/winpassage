@@ -3,26 +3,42 @@ import { invoke } from '@tauri-apps/api/core';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import { winPassageMarkSvg } from './brand';
+import { lucideSvg, type IconName } from './icons';
 import type {
   ActionResponse,
+  AdminHostStatus,
   ListSessionsResponse,
   ListUsersResponse,
   LocalSessionSummary,
   LocalUserSummary,
   ServerInstallResult,
-  AdminHostStatus,
   ServerProfile,
 } from './types';
 
+type AdminTab = 'overview' | 'users' | 'sessions' | 'servers' | 'settings';
+type ThemeMode = 'light' | 'system' | 'dark';
+
 const PROFILE_STORAGE_KEY = 'winpassage.admin.serverProfiles';
 const ACTIVE_PROFILE_KEY = 'winpassage.admin.activeServerId';
+const THEME_KEY = 'winpassage.admin.theme';
+const SETUP_KEY = 'winpassage.admin.initialSetupComplete';
+const TOUR_KEY = 'winpassage.admin.tourComplete';
+
+const navigation: Array<{ id: AdminTab; label: string; icon: IconName }> = [
+  { id: 'overview', label: 'Overview', icon: 'overview' },
+  { id: 'users', label: 'Users', icon: 'users' },
+  { id: 'sessions', label: 'Sessions', icon: 'sessions' },
+  { id: 'servers', label: 'Servers', icon: 'servers' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
+];
 
 function defaultServerProfiles(): ServerProfile[] {
   return [
     {
       id: 'local-dev',
-      name: 'Local development',
-      network_name: 'Local machine',
+      name: 'Local machine',
+      network_name: 'This device',
       protocol: 'http',
       host: 'localhost',
       port: 4487,
@@ -52,10 +68,16 @@ function normalizeUrl(value: string): URL {
   return new URL(trimmed.includes('://') ? trimmed : `http://${trimmed}`);
 }
 
+function icon(name: IconName): string {
+  return lucideSvg(name);
+}
+
+const brandIcon = winPassageMarkSvg('brand-svg');
+const activeTab = ref<AdminTab>('overview');
+const theme = ref<ThemeMode>((localStorage.getItem(THEME_KEY) as ThemeMode | null) ?? 'system');
 const serverProfiles = ref<ServerProfile[]>(loadServerProfiles());
 const activeServerId = ref(localStorage.getItem(ACTIVE_PROFILE_KEY) ?? serverProfiles.value[0]?.id ?? 'local-dev');
-const activeServerProfile = computed(() => serverProfiles.value.find((profile) => profile.id === activeServerId.value) ?? serverProfiles.value[0]);
-const serverUrl = ref(activeServerProfile.value ? profileUrl(activeServerProfile.value) : 'http://localhost:4487');
+const serverUrl = ref(profileUrl(serverProfiles.value.find((profile) => profile.id === activeServerId.value) ?? serverProfiles.value[0]));
 const adminToken = ref('');
 const users = ref<LocalUserSummary[]>([]);
 const sessions = ref<LocalSessionSummary[]>([]);
@@ -95,48 +117,60 @@ const deleteConfirmation = ref('');
 const deleteLogoffSessions = ref(true);
 const deleteProfile = ref(false);
 
+const initialSetupOpen = ref(localStorage.getItem(SETUP_KEY) !== 'true');
+const tourCompleted = ref(localStorage.getItem(TOUR_KEY) === 'true');
+
+const activeServerProfile = computed(
+  () => serverProfiles.value.find((profile) => profile.id === activeServerId.value) ?? serverProfiles.value[0],
+);
 const enabledUsers = computed(() => users.value.filter((user) => !user.disabled).length);
 const adminUsers = computed(() => users.value.filter((user) => user.is_administrator).length);
 const activeSessions = computed(() => sessions.value.filter((session) => session.username).length);
 const selectedUserRecord = computed(() => users.value.find((user) => user.username === selectedUser.value) ?? null);
-const passwordLengthHint = computed(() => `${newPassword.value.length}/12 minimum characters`);
+const isHostAdmin = computed(() => hostStatus.value?.is_windows === true && hostStatus.value?.is_admin_account === true);
+const isElevated = computed(() => hostStatus.value?.is_elevated === true);
+const isLocked = computed(() => hostStatus.value?.is_windows === true && hostStatus.value?.is_admin_account === false);
+const installServerUrl = computed(() => `http://${installBindHost.value}:${installPort.value}`);
+const currentPage = computed(() => navigation.find((item) => item.id === activeTab.value) ?? navigation[0]);
+const canLoadRemoteData = computed(() => serverUrl.value.trim().length > 0 && adminToken.value.trim().length > 0);
 const canReset = computed(() => selectedUser.value.length > 0 && newPassword.value.length >= 12 && adminToken.value.length > 0);
 const canCreate = computed(() => createUsername.value.length > 0 && createPassword.value.length >= 12 && adminToken.value.length > 0);
 const canDelete = computed(() => selectedUser.value.length > 0 && deleteConfirmation.value === selectedUser.value && adminToken.value.length > 0);
 const canAddServer = computed(() => newServerName.value.trim().length > 0 && newServerHost.value.trim().length > 0 && Number(newServerPort.value) > 0);
-const isHostAdmin = computed(() => hostStatus.value?.is_windows === true && hostStatus.value?.is_admin_account === true);
-const isElevated = computed(() => hostStatus.value?.is_elevated === true);
-const installServerUrl = computed(() => `http://${installBindHost.value}:${installPort.value}`);
 const canInstallServer = computed(
-  () =>
-    isElevated.value &&
-    installBindHost.value.trim().length > 0 &&
-    Number(installPort.value) > 0 &&
-    Number(installPort.value) <= 65535 &&
-    installAdminToken.value.trim().length >= 16,
+  () => isElevated.value && installBindHost.value.trim().length > 0 && Number(installPort.value) > 0 && installAdminToken.value.trim().length >= 16,
 );
 const canDemoteServer = computed(() => isElevated.value && demoteConfirmation.value === 'DEMOTE SERVER');
-const initialSetupOpen = ref(localStorage.getItem('winpassage.admin.initialSetupComplete') !== 'true');
-const tourCompleted = ref(localStorage.getItem('winpassage.admin.tourComplete') === 'true');
 
-async function loadHostStatus() {
-  hostStatusLoading.value = true;
-  try {
-    hostStatus.value = await invoke<AdminHostStatus>('get_admin_host_status');
-    if (hostStatus.value.executable_dir && !installSourceDir.value) {
-      installSourceDir.value = hostStatus.value.executable_dir;
-    }
-    installDir.value = hostStatus.value.install_dir || installDir.value;
-  } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
-  } finally {
-    hostStatusLoading.value = false;
-  }
+function applyTheme() {
+  const resolved = theme.value === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme.value;
+  document.documentElement.dataset.theme = resolved;
+  localStorage.setItem(THEME_KEY, theme.value);
+}
+
+function setTheme(value: ThemeMode) {
+  theme.value = value;
+  applyTheme();
 }
 
 function persistProfiles() {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(serverProfiles.value));
   localStorage.setItem(ACTIVE_PROFILE_KEY, activeServerId.value);
+}
+
+function syncActiveProfileFromServerUrl() {
+  const profile = activeServerProfile.value;
+  if (!profile) return;
+
+  try {
+    const url = normalizeUrl(serverUrl.value);
+    profile.protocol = url.protocol === 'https:' ? 'https' : 'http';
+    profile.host = url.hostname;
+    profile.port = Number(url.port || (profile.protocol === 'https' ? 443 : 80));
+    serverUrl.value = profileUrl(profile);
+  } catch {
+    error.value = 'Use a server address such as http://192.168.1.10:4487.';
+  }
 }
 
 function persistSettings() {
@@ -174,7 +208,7 @@ function addServerProfile() {
   newServerProtocol.value = 'http';
   newServerNotes.value = '';
   selectServerProfile(profile);
-  message.value = `Added server profile ${profile.name}.`;
+  message.value = `Added ${profile.name}.`;
 }
 
 function removeServerProfile(profile: ServerProfile) {
@@ -184,26 +218,8 @@ function removeServerProfile(profile: ServerProfile) {
   }
 
   serverProfiles.value = serverProfiles.value.filter((item) => item.id !== profile.id);
-  if (activeServerId.value === profile.id) {
-    selectServerProfile(serverProfiles.value[0]);
-  }
+  if (activeServerId.value === profile.id) selectServerProfile(serverProfiles.value[0]);
   persistProfiles();
-  message.value = `Removed server profile ${profile.name}.`;
-}
-
-function syncActiveProfileFromServerUrl() {
-  const profile = activeServerProfile.value;
-  if (!profile) return;
-
-  try {
-    const url = normalizeUrl(serverUrl.value);
-    profile.protocol = url.protocol === 'https:' ? 'https' : 'http';
-    profile.host = url.hostname;
-    profile.port = Number(url.port || (profile.protocol === 'https' ? 443 : 80));
-    serverUrl.value = profileUrl(profile);
-  } catch {
-    error.value = 'Invalid server URL. Use an address such as http://192.168.1.10:4487.';
-  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -216,72 +232,55 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
   });
-
   const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(payload.error ?? `Request failed with ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(payload.error ?? `Request failed with ${response.status}`);
   return payload as T;
-}
-
-async function runLocalTask(task: () => Promise<string>) {
-  loading.value = true;
-  error.value = '';
-  message.value = '';
-
-  try {
-    message.value = await task();
-  } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
-  } finally {
-    loading.value = false;
-  }
 }
 
 async function runTask(task: () => Promise<string>, refresh = true) {
   loading.value = true;
-  error.value = '';
   message.value = '';
-
+  error.value = '';
   try {
     message.value = await task();
-    if (refresh) {
-      await Promise.allSettled([loadUsers(false), loadSessions(false)]);
-    }
+    if (refresh) await Promise.allSettled([loadUsers(false), loadSessions(false)]);
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught);
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadHostStatus() {
+  hostStatusLoading.value = true;
+  try {
+    hostStatus.value = await invoke<AdminHostStatus>('get_admin_host_status');
+    installSourceDir.value = hostStatus.value.executable_dir ?? installSourceDir.value;
+    installDir.value = hostStatus.value.install_dir || installDir.value;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  } finally {
+    hostStatusLoading.value = false;
   }
 }
 
 async function loadUsers(showMessage = true) {
   const payload = await request<ListUsersResponse>('/v1/users');
   users.value = payload.users;
-  if (showMessage) {
-    message.value = `Loaded ${payload.users.length} local Windows accounts from ${activeServerProfile.value?.name ?? serverUrl.value}.`;
-  }
+  if (!selectedUser.value && payload.users[0]) selectedUser.value = payload.users[0].username;
+  if (showMessage) message.value = `Loaded ${payload.users.length} local users.`;
 }
 
 async function loadSessions(showMessage = true) {
   const payload = await request<ListSessionsResponse>('/v1/sessions');
   sessions.value = payload.sessions;
-  if (showMessage) {
-    message.value = `Loaded ${payload.sessions.length} Windows sessions from ${activeServerProfile.value?.name ?? serverUrl.value}.`;
-  }
+  if (showMessage) message.value = `Loaded ${payload.sessions.length} sessions.`;
 }
 
 async function refreshAll() {
   await runTask(async () => {
-    const [userPayload, sessionPayload] = await Promise.all([
-      request<ListUsersResponse>('/v1/users'),
-      request<ListSessionsResponse>('/v1/sessions'),
-    ]);
-    users.value = userPayload.users;
-    sessions.value = sessionPayload.sessions;
-    return `Loaded ${userPayload.users.length} users and ${sessionPayload.sessions.length} sessions from ${activeServerProfile.value?.name ?? serverUrl.value}.`;
+    await Promise.all([loadUsers(false), loadSessions(false)]);
+    return 'Users and sessions refreshed.';
   }, false);
 }
 
@@ -290,23 +289,21 @@ async function createUser() {
     const payload = await request<ActionResponse>('/v1/users', {
       method: 'POST',
       body: JSON.stringify({
-        username: createUsername.value,
-        full_name: createFullName.value || null,
+        username: createUsername.value.trim(),
+        full_name: createFullName.value.trim() || null,
         password: createPassword.value,
         must_change_password: createMustChange.value,
         enabled: createEnabled.value,
         admin: createAdmin.value,
-        reason: reason.value || 'Admin-created local account',
+        reason: reason.value || null,
         request_id: crypto.randomUUID(),
       }),
     });
-
-    selectedUser.value = createUsername.value;
+    selectedUser.value = createUsername.value.trim();
     createUsername.value = '';
     createFullName.value = '';
     createPassword.value = '';
-    createAdmin.value = false;
-    return `${payload.message}. Request ${payload.request_id}`;
+    return payload.message;
   });
 }
 
@@ -314,15 +311,10 @@ async function resetPassword() {
   await runTask(async () => {
     const payload = await request<ActionResponse>(`/v1/users/${encodeURIComponent(selectedUser.value)}/password/reset`, {
       method: 'POST',
-      body: JSON.stringify({
-        new_password: newPassword.value,
-        reason: reason.value || null,
-        request_id: crypto.randomUUID(),
-      }),
+      body: JSON.stringify({ new_password: newPassword.value, reason: reason.value || null, request_id: crypto.randomUUID() }),
     });
-
     newPassword.value = '';
-    return `${payload.message}. Request ${payload.request_id}`;
+    return payload.message;
   });
 }
 
@@ -330,13 +322,9 @@ async function setEnabled(enabled: boolean) {
   await runTask(async () => {
     const payload = await request<ActionResponse>(`/v1/users/${encodeURIComponent(selectedUser.value)}/enabled`, {
       method: 'POST',
-      body: JSON.stringify({
-        enabled,
-        reason: reason.value || null,
-        request_id: crypto.randomUUID(),
-      }),
+      body: JSON.stringify({ enabled, reason: reason.value || null, request_id: crypto.randomUUID() }),
     });
-    return `${payload.message}. Request ${payload.request_id}`;
+    return payload.message;
   });
 }
 
@@ -344,32 +332,43 @@ async function setAdministrator(enabled: boolean) {
   await runTask(async () => {
     const payload = await request<ActionResponse>(`/v1/users/${encodeURIComponent(selectedUser.value)}/admin`, {
       method: 'POST',
+      body: JSON.stringify({ enabled, reason: reason.value || null, request_id: crypto.randomUUID() }),
+    });
+    return payload.message;
+  });
+}
+
+async function deleteUser() {
+  await runTask(async () => {
+    const payload = await request<ActionResponse>(`/v1/users/${encodeURIComponent(selectedUser.value)}`, {
+      method: 'DELETE',
       body: JSON.stringify({
-        enabled,
+        confirmation: deleteConfirmation.value,
+        logoff_sessions: deleteLogoffSessions.value,
+        delete_profile: deleteProfile.value,
         reason: reason.value || null,
         request_id: crypto.randomUUID(),
       }),
     });
-    return `${payload.message}. Request ${payload.request_id}`;
+    selectedUser.value = '';
+    deleteConfirmation.value = '';
+    return payload.message;
   });
 }
 
-async function logoffSession(sessionId: number) {
+async function logoffSession(session: LocalSessionSummary) {
   await runTask(async () => {
-    const payload = await request<ActionResponse>(`/v1/sessions/${sessionId}/logoff`, {
+    const payload = await request<ActionResponse>(`/v1/sessions/${session.session_id}/logoff`, {
       method: 'POST',
-      body: JSON.stringify({
-        reason: reason.value || 'Admin requested session logoff',
-        request_id: crypto.randomUUID(),
-      }),
+      body: JSON.stringify({ reason: reason.value || null, request_id: crypto.randomUUID() }),
     });
-    return `${payload.message}. Request ${payload.request_id}`;
+    return payload.message;
   });
 }
 
-async function installServerMode() {
-  await runLocalTask(async () => {
-    const result = await invoke<ServerInstallResult>('install_server_mode', {
+async function installServer() {
+  await runTask(async () => {
+    const payload = await invoke<ServerInstallResult>('install_server_mode', {
       request: {
         source_dir: installSourceDir.value || null,
         install_dir: installDir.value || null,
@@ -379,57 +378,35 @@ async function installServerMode() {
         require_tls: installRequireTls.value,
       },
     });
-
-    serverUrl.value = result.server_url || installServerUrl.value;
-    adminToken.value = installAdminToken.value;
-    return `${result.message} Use ${serverUrl.value} from clients and admin profiles.`;
-  });
+    await loadHostStatus();
+    return payload.message;
+  }, false);
 }
 
-async function demoteServerMode() {
-  await runLocalTask(async () => {
-    const result = await invoke<ServerInstallResult>('demote_server_mode', {
+async function demoteServer() {
+  await runTask(async () => {
+    const payload = await invoke<ServerInstallResult>('demote_server_mode', {
       request: {
         install_dir: installDir.value || null,
         confirmation: demoteConfirmation.value,
         remove_files: demoteRemoveFiles.value,
       },
     });
-
     demoteConfirmation.value = '';
-    return result.message;
-  });
+    await loadHostStatus();
+    return payload.message;
+  }, false);
 }
 
-async function deleteUser() {
-  await runTask(async () => {
-    const payload = await request<ActionResponse>(`/v1/users/${encodeURIComponent(selectedUser.value)}`, {
-      method: 'DELETE',
-      body: JSON.stringify({
-        delete_profile: deleteProfile.value,
-        logoff_sessions: deleteLogoffSessions.value,
-        reason: reason.value || 'Admin deleted local account',
-        request_id: crypto.randomUUID(),
-      }),
-    });
-
-    selectedUser.value = '';
-    deleteConfirmation.value = '';
-    deleteProfile.value = false;
-    return `${payload.message}. Request ${payload.request_id}`;
-  });
-}
-
-
-function saveInitialSetup() {
-  localStorage.setItem('winpassage.admin.initialSetupComplete', 'true');
+function finishInitialSetup() {
+  persistSettings();
+  localStorage.setItem(SETUP_KEY, 'true');
   initialSetupOpen.value = false;
   void nextTick(() => startAdminTour());
 }
 
 function startAdminTour(force = false) {
   if (!force && tourCompleted.value) return;
-
   const tour = driver({
     showProgress: true,
     allowClose: true,
@@ -437,523 +414,265 @@ function startAdminTour(force = false) {
     prevBtnText: 'Back',
     doneBtnText: 'Done',
     steps: [
-      {
-        element: '#admin-server-install',
-        popover: {
-          title: 'Install the server',
-          description: 'Use this section only on the Windows Pro machine that should run the WinPassage service.',
-        },
-      },
-      {
-        element: '#admin-server-registry',
-        popover: {
-          title: 'Add servers by IP and port',
-          description: 'Each profile points to one standalone WinPassage server. Profiles do not copy users between machines.',
-        },
-      },
-      {
-        element: '#admin-users',
-        popover: {
-          title: 'Manage real Windows accounts',
-          description: 'Users and sessions are read from the selected server. WinPassage does not keep a separate user database.',
-        },
-      },
+      { element: '#admin-server', popover: { title: 'Server profile', description: 'Select the central Windows Pro machine by IP address and port.' } },
+      { element: '#admin-users', popover: { title: 'Windows users', description: 'Users are read from Windows directly, not from a WinPassage database.' } },
+      { element: '#admin-install', popover: { title: 'Server install', description: 'Installing or removing the service requires elevation.' } },
+      { element: '#admin-settings', popover: { title: 'Settings', description: 'Choose the app theme and review connection defaults.' } },
     ],
     onDestroyed: () => {
       tourCompleted.value = true;
-      localStorage.setItem('winpassage.admin.tourComplete', 'true');
+      localStorage.setItem(TOUR_KEY, 'true');
     },
   });
-
   tour.drive();
 }
 
-onMounted(async () => {
-  await loadHostStatus();
-  if (!initialSetupOpen.value) {
-    void nextTick(() => startAdminTour());
-  }
+onMounted(() => {
+  applyTheme();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  void loadHostStatus();
+  if (!initialSetupOpen.value) void nextTick(() => startAdminTour());
 });
-
 </script>
 
 <template>
   <main class="app app-admin">
-    <section v-if="initialSetupOpen && isHostAdmin" class="setup-overlay" role="dialog" aria-modal="true">
-      <article class="setup-card">
-        <p class="eyebrow">First run</p>
-        <h1>Set the first admin connection.</h1>
-        <p class="lead">Confirm the local service port and admin token before the guide starts.</p>
-        <div class="grid two">
-          <label>
-            Server port
-            <input v-model.number="installPort" type="number" min="1" max="65535" />
-          </label>
-          <label>
-            Admin token
-            <input v-model="installAdminToken" type="password" autocomplete="new-password" placeholder="At least 16 characters" />
-          </label>
+    <section v-if="initialSetupOpen" class="setup-overlay" role="dialog" aria-modal="true">
+      <article class="setup-card compact-card">
+        <div class="setup-brand" v-html="brandIcon"></div>
+        <p class="eyebrow">Initial setup</p>
+        <h1>Prepare WinPassageAdmin</h1>
+        <p class="lead">Add the central machine address. The guided tour starts after this step.</p>
+        <div class="form-grid two">
+          <label>Server address<input v-model="serverUrl" placeholder="http://192.168.1.10:4487" /></label>
+          <label>Admin token<input v-model="adminToken" type="password" autocomplete="off" placeholder="Session token" /></label>
         </div>
-        <div class="actions">
-          <button :disabled="installAdminToken.trim().length < 16" @click="saveInitialSetup">Save and show guide</button>
-          <button class="secondary" @click="initialSetupOpen = false; startAdminTour(true)">Skip setup</button>
-        </div>
-      </article>
-    </section>
-    <section v-if="hostStatusLoading" class="lock-screen">
-      <article class="lock-card">
-        <div class="lock-icon">…</div>
-        <p class="eyebrow">Checking privileges</p>
-        <h1>Preparing the admin console.</h1>
-        <p class="lead">WinPassage is checking whether this Windows account can manage the local server installation.</p>
-      </article>
-    </section>
-
-    <section v-else-if="!isHostAdmin" class="lock-screen">
-      <article class="lock-card">
-        <div class="lock-icon">🔒</div>
-        <p class="eyebrow">Administrator account required</p>
-        <h1>This console is locked.</h1>
-        <p class="lead">{{ hostStatus?.message }}</p>
-        <ol class="step-list">
-          <li class="step-item"><span class="step-number">1</span><span>Sign out from the standard Windows account.</span></li>
-          <li class="step-item"><span class="step-number">2</span><span>Sign in with a local administrator account on this computer.</span></li>
-          <li class="step-item"><span class="step-number">3</span><span>Open WinPassageAdmin again. Use Run as administrator when installing or removing the service.</span></li>
-        </ol>
-        <div class="actions">
-          <button class="secondary" @click="loadHostStatus">Check again</button>
+        <div class="button-row end">
+          <button class="btn-primary" :disabled="!serverUrl.trim()" @click="finishInitialSetup">Save and continue</button>
         </div>
       </article>
     </section>
 
-    <section v-else class="app-shell">
-      <aside class="side-rail" aria-label="WinPassageAdmin navigation">
-        <div class="brand-block">
-          <div class="brand-mark" aria-hidden="true"><span class="bridge-icon">⊞</span></div>
+    <section class="app-shell">
+      <aside class="sidebar" aria-label="WinPassageAdmin navigation">
+        <div class="brand-row">
+          <span class="app-mark" v-html="brandIcon"></span>
           <div>
-            <p class="brand-title">WinPassage</p>
-            <p class="brand-subtitle">Admin console</p>
+            <p class="brand-title">WinPassageAdmin</p>
+            <p class="brand-subtitle">Local Windows control</p>
           </div>
         </div>
 
-        <nav class="rail-menu" aria-label="Workspace sections">
-          <span class="rail-item active"><span class="rail-dot"></span>Overview</span>
-          <span class="rail-item">Networks</span>
-          <span class="rail-item">Server install</span>
-          <span class="rail-item">Users</span>
-          <span class="rail-item">Access</span>
-          <span class="rail-item">Sessions</span>
-          <span class="rail-item">Audit</span>
+        <nav class="nav-list" aria-label="Main sections">
+          <button v-for="item in navigation" :key="item.id" class="nav-item" :class="{ active: activeTab === item.id }" @click="activeTab = item.id">
+            <span v-html="icon(item.icon)"></span>{{ item.label }}
+          </button>
         </nav>
 
-        <div class="rail-footer">
-          <p class="metric-label">Security note</p>
-          <p class="muted">Server profiles are local admin-console settings. Windows users are always read from the selected server.</p>
+        <div class="sidebar-status">
+          <p class="status-line"><span class="dot success"></span>{{ isElevated ? 'Elevated' : isHostAdmin ? 'Admin account' : 'Standard user' }}</p>
+          <p>{{ activeServerProfile?.host }}:{{ activeServerProfile?.port }}</p>
         </div>
       </aside>
 
       <section class="workspace">
-        <header class="hero-panel">
-          <div class="hero-grid">
-            <div>
-              <p class="eyebrow">Windows Pro central machines</p>
-              <h1>Manage local Windows Pro servers.</h1>
-              <p class="lead">
-                Add each server by IP and port. User operations always run on the selected Windows machine.
-              </p>
-            </div>
-            <div class="status-stack">
-              <span class="status-pill success">Windows accounts</span>
-              <span class="status-pill warning">Per-server actions</span>
-              <span class="status-pill">Small networks</span>
-            </div>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">{{ currentPage.label }}</p>
+            <h1>{{ currentPage.label }}</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn-ghost" @click="initialSetupOpen = true"><span v-html="icon('settings')"></span>Initial setup</button>
+            <button class="btn-ghost" @click="startAdminTour(true)"><span v-html="icon('play')"></span>Guide</button>
+            <button class="btn-primary" :disabled="loading || !canLoadRemoteData" @click="refreshAll"><span v-html="icon('refresh')"></span>Refresh</button>
           </div>
         </header>
 
-        <section class="metric-grid" aria-label="Server and user statistics">
-          <article class="metric-card">
-            <p class="metric-label">Server profiles</p>
-            <p class="metric-value">{{ serverProfiles.length }}</p>
-            <p class="metric-hint">Separate central machines</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">Active server</p>
-            <p class="metric-value compact">{{ activeServerProfile?.name || '—' }}</p>
-            <p class="metric-hint">{{ serverUrl }}</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">Loaded users</p>
-            <p class="metric-value">{{ users.length }}</p>
-            <p class="metric-hint">Current Windows accounts</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">Sessions</p>
-            <p class="metric-value">{{ activeSessions }}</p>
-            <p class="metric-hint">Named Windows sessions</p>
-          </article>
+        <section v-if="isLocked" class="lock-panel surface-card">
+          <span class="lock-mark" v-html="brandIcon"></span>
+          <h2>Administrator account required</h2>
+          <p>Sign in with a Windows account that belongs to the local Administrators group to use WinPassageAdmin.</p>
+          <p class="muted">Current status: {{ hostStatus?.message || 'Checking account privileges…' }}</p>
         </section>
 
-        <section id="admin-server-install" class="surface-card server-install-card">
-          <div class="card-heading">
-            <div>
-              <h2>Make this computer a WinPassage server</h2>
-              <p class="muted">Install the background service on this Windows Pro machine. Clients and admins connect later with an <strong>IP:port</strong> address.</p>
+        <template v-else>
+          <p v-if="hostStatus && !isElevated" class="notice info"><span v-html="icon('info')"></span>{{ hostStatus.message }}</p>
+          <p v-if="message" class="notice success"><span v-html="icon('check')"></span>{{ message }}</p>
+          <p v-if="error" class="notice error"><span v-html="icon('warning')"></span>{{ error }}</p>
+
+          <section v-if="activeTab === 'overview'" class="page-stack">
+            <div class="overview-grid">
+              <article id="admin-server" class="surface-card hero-card">
+                <div class="card-title-row">
+                  <div><h2>Server status</h2><p>Monitor the selected central machine.</p></div>
+                  <span class="pill" :class="canLoadRemoteData ? 'success' : 'neutral'">{{ canLoadRemoteData ? 'Configured' : 'Needs token' }}</span>
+                </div>
+                <div class="stat-list">
+                  <span>Endpoint</span><strong>{{ serverUrl }}</strong>
+                  <span>Windows users</span><strong>{{ users.length || '—' }}</strong>
+                  <span>Active sessions</span><strong>{{ activeSessions || '—' }}</strong>
+                </div>
+              </article>
+
+              <article class="surface-card">
+                <h2>Access</h2>
+                <p class="muted">Install and uninstall actions require elevation. Browsing settings is available for local administrators.</p>
+                <button class="btn-secondary" @click="activeTab = 'servers'">Manage server</button>
+              </article>
             </div>
-            <span class="status-pill success">Administrator verified</span>
-          </div>
 
-          <p v-if="!isElevated" class="notice warning">You are signed in with an administrator account, but this app is not elevated. Close it and choose <strong>Run as administrator</strong> before installing or removing the service.</p>
-
-          <p class="notice warning">Place <strong>winpassage-server.exe</strong>, <strong>winpassage-agentctl.exe</strong>, and <strong>winpassage-updater.exe</strong> next to WinPassageAdmin or choose their source folder before installing.</p>
-
-          <div class="grid three">
-            <label>
-              Binary source folder
-              <input v-model="installSourceDir" placeholder="Folder containing the service executables" />
-            </label>
-            <label>
-              Install folder
-              <input v-model="installDir" placeholder="C:\Program Files\WinPassage" />
-            </label>
-            <label>
-              Admin token for this server
-              <input v-model="installAdminToken" type="password" autocomplete="new-password" placeholder="At least 16 characters" />
-            </label>
-            <label>
-              Bind host
-              <input v-model="installBindHost" placeholder="0.0.0.0" />
-            </label>
-            <label>
-              Port
-              <input v-model.number="installPort" type="number" min="1" max="65535" />
-            </label>
-            <label class="toggle-row install-toggle"><input v-model="installRequireTls" type="checkbox" /> Require TLS at the service boundary</label>
-          </div>
-
-          <div class="selected-card">
-            <p class="metric-label">Client/admin connection address</p>
-            <strong>{{ installServerUrl }}</strong>
-            <span class="muted">Use the server computer's LAN IP address instead of 0.0.0.0 when adding client or admin profiles.</span>
-          </div>
-
-          <div class="actions">
-            <button :disabled="loading || !canInstallServer" @click="installServerMode">Install server service</button>
-            <button class="secondary" :disabled="loading" @click="loadHostStatus">Recheck admin rights</button>
-          </div>
-        </section>
-
-        <section class="danger-card">
-          <div class="card-heading">
-            <div>
-              <h2>Demote this computer back to client-only mode</h2>
-              <p class="muted">Stops and removes the local WinPassage service. This does not delete Windows users or profiles.</p>
+            <div class="overview-grid three">
+              <article class="surface-card metric"><span v-html="icon('users')"></span><p>Users</p><strong>{{ users.length }}</strong></article>
+              <article class="surface-card metric"><span v-html="icon('shield')"></span><p>Administrators</p><strong>{{ adminUsers }}</strong></article>
+              <article class="surface-card metric"><span v-html="icon('sessions')"></span><p>Sessions</p><strong>{{ sessions.length }}</strong></article>
             </div>
-            <span class="status-pill danger">Destructive</span>
-          </div>
-          <div class="grid two">
-            <label>
-              Type DEMOTE SERVER to confirm
-              <input v-model="demoteConfirmation" placeholder="DEMOTE SERVER" />
-            </label>
-            <label class="toggle-row install-toggle"><input v-model="demoteRemoveFiles" type="checkbox" /> Remove installed WinPassage service executables</label>
-          </div>
-          <div class="actions">
-            <button class="danger" :disabled="loading || !canDemoteServer" @click="demoteServerMode">Remove server service</button>
-          </div>
-        </section>
 
-        <section id="admin-server-registry" class="surface-card">
-          <div class="card-heading">
-            <div>
-              <h2>Server registry</h2>
-              <p class="muted">Add every standalone WinPassage server machine by IP address or stable DNS name. These profiles are only admin-console shortcuts.</p>
-            </div>
-            <span class="status-pill">{{ activeServerProfile?.network_name || 'No network' }}</span>
-          </div>
+            <article class="surface-card guide-card">
+              <div><h2>Getting started</h2><p>Configure a server profile, enter the admin token, then load users and sessions.</p></div>
+              <button class="btn-primary" @click="startAdminTour(true)"><span v-html="icon('play')"></span>Start guided tour</button>
+            </article>
+          </section>
 
-          <div class="server-grid">
-            <article
-              v-for="profile in serverProfiles"
-              :key="profile.id"
-              class="server-card"
-              :class="{ active: profile.id === activeServerId }"
-            >
-              <div>
-                <p class="metric-label">{{ profile.network_name }}</p>
-                <h3>{{ profile.name }}</h3>
-                <p class="server-address">{{ profileUrl(profile) }}</p>
-                <p class="muted">{{ profile.notes || 'Standalone Windows Pro server profile.' }}</p>
+          <section v-if="activeTab === 'users'" id="admin-users" class="page-grid two-wide">
+            <article class="surface-card table-card">
+              <div class="card-title-row"><div><h2>Local users</h2><p>Read directly from the selected Windows machine.</p></div><span class="pill neutral">{{ users.length }} users</span></div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>User</th><th>Name</th><th>Status</th><th>Access</th><th>Sessions</th></tr></thead>
+                  <tbody>
+                    <tr v-for="user in users" :key="user.username" :class="{ selected: selectedUser === user.username }" @click="selectedUser = user.username">
+                      <td><strong>{{ user.username }}</strong></td>
+                      <td>{{ user.full_name || '—' }}</td>
+                      <td><span class="pill" :class="user.disabled ? 'danger' : 'success'">{{ user.disabled ? 'Disabled' : 'Enabled' }}</span></td>
+                      <td><span class="pill" :class="user.is_administrator ? 'warning' : 'neutral'">{{ user.is_administrator ? 'Admin' : 'Standard' }}</span></td>
+                      <td>{{ user.active_session_count }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div class="actions wrap">
-                <button class="secondary small" :disabled="profile.id === activeServerId" @click="selectServerProfile(profile)">Use</button>
-                <button class="danger small" :disabled="serverProfiles.length <= 1" @click="removeServerProfile(profile)">Remove</button>
+              <div v-if="users.length === 0" class="empty-state"><span v-html="brandIcon"></span><p>No users loaded yet.</p></div>
+            </article>
+
+            <aside class="side-panel">
+              <article class="surface-card">
+                <h2>Create user</h2>
+                <div class="form-grid">
+                  <label>Username<input v-model="createUsername" placeholder="julia" /></label>
+                  <label>Full name<input v-model="createFullName" placeholder="Julia Nagy" /></label>
+                  <label>Initial password<input v-model="createPassword" type="password" autocomplete="new-password" /></label>
+                </div>
+                <label class="check-row"><input v-model="createMustChange" type="checkbox" />Require change at next sign-in</label>
+                <label class="check-row"><input v-model="createEnabled" type="checkbox" />Enable account</label>
+                <label class="check-row"><input v-model="createAdmin" type="checkbox" />Add to Administrators</label>
+                <button class="btn-primary full" :disabled="loading || !canCreate" @click="createUser">Create user</button>
+              </article>
+
+              <article class="surface-card danger-zone">
+                <h2>Selected account</h2>
+                <p class="muted">{{ selectedUserRecord?.username || 'No user selected' }}</p>
+                <label>New password<input v-model="newPassword" type="password" autocomplete="new-password" /></label>
+                <label>Audit reason<textarea v-model="reason" rows="3" placeholder="Reason for this change"></textarea></label>
+                <div class="button-grid">
+                  <button class="btn-primary" :disabled="loading || !canReset" @click="resetPassword">Reset password</button>
+                  <button class="btn-secondary" :disabled="loading || !selectedUser" @click="setEnabled(true)">Enable</button>
+                  <button class="btn-secondary" :disabled="loading || !selectedUser" @click="setEnabled(false)">Disable</button>
+                  <button class="btn-secondary" :disabled="loading || !selectedUser" @click="setAdministrator(true)">Grant admin</button>
+                  <button class="btn-danger" :disabled="loading || !selectedUser" @click="setAdministrator(false)">Revoke admin</button>
+                </div>
+                <label>Type username to delete<input v-model="deleteConfirmation" :placeholder="selectedUser || 'username'" /></label>
+                <label class="check-row"><input v-model="deleteLogoffSessions" type="checkbox" />Log off sessions first</label>
+                <label class="check-row"><input v-model="deleteProfile" type="checkbox" />Request profile deletion</label>
+                <button class="btn-danger full" :disabled="loading || !canDelete" @click="deleteUser">Delete account</button>
+              </article>
+            </aside>
+          </section>
+
+          <section v-if="activeTab === 'sessions'" class="page-stack">
+            <article class="surface-card table-card">
+              <div class="card-title-row"><div><h2>Sessions</h2><p>Log off active Windows sessions when needed.</p></div><span class="pill neutral">{{ sessions.length }} sessions</span></div>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>ID</th><th>User</th><th>State</th><th>Client</th><th></th></tr></thead>
+                  <tbody>
+                    <tr v-for="session in sessions" :key="session.session_id">
+                      <td>{{ session.session_id }}</td><td>{{ session.username || '—' }}</td><td>{{ session.state }}</td><td>{{ session.client_name || (session.is_console ? 'Console' : '—') }}</td>
+                      <td><button class="btn-secondary small" :disabled="loading" @click="logoffSession(session)">Log off</button></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </article>
-          </div>
+          </section>
 
-          <div class="grid three server-form">
-            <label>
-              Name
-              <input v-model="newServerName" placeholder="Office server" />
-            </label>
-            <label>
-              Network
-              <input v-model="newServerNetwork" placeholder="Budapest office" />
-            </label>
-            <label>
-              IP address or DNS name
-              <input v-model="newServerHost" placeholder="192.168.1.10" />
-            </label>
-            <label>
-              Protocol
-              <select v-model="newServerProtocol">
-                <option value="http">http</option>
-                <option value="https">https</option>
-              </select>
-            </label>
-            <label>
-              Port
-              <input v-model.number="newServerPort" type="number" min="1" max="65535" />
-            </label>
-            <label>
-              Notes
-              <input v-model="newServerNotes" placeholder="Optional operator note" />
-            </label>
-          </div>
-
-          <div class="actions">
-            <button :disabled="!canAddServer" @click="addServerProfile">Add server profile</button>
-          </div>
-        </section>
-
-        <section class="surface-card">
-          <div class="card-heading">
-            <div>
-              <h2>Connection</h2>
-              <p class="muted">Connect to the selected WinPassage service. Admin tokens stay session-only and are not stored with the server profile.</p>
-            </div>
-            <span class="status-pill" :class="adminToken ? 'success' : 'warning'">{{ adminToken ? 'Token provided' : 'Token required' }}</span>
-          </div>
-          <div class="grid two">
-            <label>
-              Active server URL
-              <input v-model="serverUrl" placeholder="http://192.168.1.10:4487" />
-            </label>
-            <label>
-              Admin token
-              <input v-model="adminToken" type="password" autocomplete="off" placeholder="Session-only operator token" />
-            </label>
-          </div>
-          <div class="actions">
-            <button :disabled="loading || !adminToken" @click="refreshAll">Load users & sessions</button>
-            <button class="secondary" :disabled="loading" @click="persistSettings">Save active server address</button>
-          </div>
-        </section>
-
-        <p v-if="message" class="notice success">{{ message }}</p>
-        <p v-if="error" class="notice error">{{ error }}</p>
-
-        <section class="panel-grid">
-          <article class="surface-card">
-            <div class="card-heading">
-              <div>
-                <h2 id="admin-users">Local users</h2>
-                <p class="muted">The list is loaded from the selected server's local Windows accounts, not from a WinPassage database.</p>
+          <section v-if="activeTab === 'servers'" id="admin-install" class="page-grid two-wide">
+            <article class="surface-card">
+              <div class="card-title-row"><div><h2>Server profiles</h2><p>Connection shortcuts only. Users are never stored here.</p></div></div>
+              <div class="profile-list">
+                <button v-for="profile in serverProfiles" :key="profile.id" class="profile-row" :class="{ selected: activeServerId === profile.id }" @click="selectServerProfile(profile)">
+                  <span><strong>{{ profile.name }}</strong><small>{{ profile.network_name }} · {{ profile.host }}:{{ profile.port }}</small></span>
+                  <span v-html="icon('chevronRight')"></span>
+                </button>
               </div>
-              <span class="status-pill">{{ selectedUser || 'No selection' }}</span>
-            </div>
-
-            <div v-if="users.length" class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>User</th>
-                    <th>Full name</th>
-                    <th>Status</th>
-                    <th>Access</th>
-                    <th>Sessions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="user in users"
-                    :key="user.username"
-                    :class="{ active: selectedUser === user.username }"
-                    @click="selectedUser = user.username"
-                  >
-                    <td>
-                      <span class="user-cell">
-                        <strong>{{ user.username }}</strong>
-                        <span class="muted">Local Windows account</span>
-                      </span>
-                    </td>
-                    <td>{{ user.full_name || '—' }}</td>
-                    <td>
-                      <span class="badge" :class="user.disabled ? 'danger' : 'success'">{{ user.disabled ? 'Disabled' : 'Enabled' }}</span>
-                    </td>
-                    <td>
-                      <span class="badge" :class="user.is_administrator ? 'warning' : 'neutral'">{{ user.is_administrator ? 'Administrator' : 'Standard' }}</span>
-                    </td>
-                    <td>{{ user.active_session_count }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div v-else class="empty-state">
-              <div>
-                <h3>No users loaded</h3>
-                <p>Select a server profile, enter the admin token, then load local users from that machine.</p>
+              <div class="form-grid two">
+                <label>Name<input v-model="newServerName" placeholder="Front office" /></label>
+                <label>Network<input v-model="newServerNetwork" placeholder="Budapest" /></label>
+                <label>Host<input v-model="newServerHost" placeholder="192.168.1.10" /></label>
+                <label>Port<input v-model.number="newServerPort" type="number" min="1" max="65535" /></label>
+                <label>Protocol<select v-model="newServerProtocol"><option value="http">http</option><option value="https">https</option></select></label>
+                <label>Notes<input v-model="newServerNotes" placeholder="Optional" /></label>
               </div>
-            </div>
-          </article>
+              <div class="button-row"><button class="btn-secondary" :disabled="!canAddServer" @click="addServerProfile">Add profile</button><button class="btn-ghost" :disabled="!activeServerProfile" @click="activeServerProfile && removeServerProfile(activeServerProfile)">Remove selected</button></div>
+            </article>
 
-          <article class="surface-card">
-            <div class="card-heading">
-              <div>
-                <h2>Create local account</h2>
-                <p class="muted">Creates a real Windows local user on the active central machine.</p>
+            <aside class="side-panel">
+              <article class="surface-card">
+                <h2>Connection</h2>
+                <label>Active server URL<input v-model="serverUrl" placeholder="http://192.168.1.10:4487" /></label>
+                <label>Admin token<input v-model="adminToken" type="password" autocomplete="off" /></label>
+                <button class="btn-primary full" :disabled="loading || !canLoadRemoteData" @click="refreshAll">Load data</button>
+              </article>
+
+              <article class="surface-card">
+                <h2>Install server service</h2>
+                <p class="muted">Copies service executables and installs the Windows Service on this computer.</p>
+                <div class="form-grid">
+                  <label>Source folder<input v-model="installSourceDir" /></label>
+                  <label>Install folder<input v-model="installDir" /></label>
+                  <label>Bind host<input v-model="installBindHost" /></label>
+                  <label>Port<input v-model.number="installPort" type="number" min="1" max="65535" /></label>
+                  <label>Admin token<input v-model="installAdminToken" type="password" /></label>
+                </div>
+                <label class="check-row"><input v-model="installRequireTls" type="checkbox" />Require TLS boundary</label>
+                <p class="muted">URL: {{ installServerUrl }}</p>
+                <button class="btn-primary full" :disabled="loading || !canInstallServer" @click="installServer">Install server</button>
+              </article>
+
+              <article class="surface-card danger-zone">
+                <h2>Return to client-only</h2>
+                <label>Type DEMOTE SERVER<input v-model="demoteConfirmation" /></label>
+                <label class="check-row"><input v-model="demoteRemoveFiles" type="checkbox" />Remove copied executables</label>
+                <button class="btn-danger full" :disabled="loading || !canDemoteServer" @click="demoteServer">Remove server service</button>
+              </article>
+            </aside>
+          </section>
+
+          <section v-if="activeTab === 'settings'" id="admin-settings" class="page-grid two">
+            <article class="surface-card">
+              <h2>Appearance</h2>
+              <p class="muted">Choose a calm interface theme.</p>
+              <div class="segmented">
+                <button :class="{ active: theme === 'light' }" @click="setTheme('light')"><span v-html="icon('sun')"></span>Light</button>
+                <button :class="{ active: theme === 'system' }" @click="setTheme('system')"><span v-html="icon('monitor')"></span>System</button>
+                <button :class="{ active: theme === 'dark' }" @click="setTheme('dark')"><span v-html="icon('moon')"></span>Dark</button>
               </div>
-              <span class="status-pill warning">Admin action</span>
-            </div>
-
-            <div class="grid two">
-              <label>
-                Username
-                <input v-model="createUsername" placeholder="julia" />
-              </label>
-              <label>
-                Full name
-                <input v-model="createFullName" placeholder="Julia Nagy" />
-              </label>
-              <label>
-                Initial password
-                <input v-model="createPassword" type="password" autocomplete="new-password" />
-              </label>
-              <label>
-                Audit reason
-                <input v-model="reason" placeholder="New employee onboarding" />
-              </label>
-            </div>
-            <div class="toggle-grid">
-              <label class="toggle-row"><input v-model="createMustChange" type="checkbox" /> Require password change at next sign-in</label>
-              <label class="toggle-row"><input v-model="createEnabled" type="checkbox" /> Enable account immediately</label>
-              <label class="toggle-row"><input v-model="createAdmin" type="checkbox" /> Add to local Administrators group</label>
-            </div>
-            <div class="actions">
-              <button :disabled="loading || !canCreate" @click="createUser">Create user on active server</button>
-            </div>
-          </article>
-        </section>
-
-        <section class="panel-grid">
-          <article class="danger-card">
-            <div class="card-heading">
-              <div>
-                <h2>Account control</h2>
-                <p class="muted">Change status, reset password, and manage administrator access for the selected user on the active server.</p>
-              </div>
-              <span class="status-pill danger">Privileged</span>
-            </div>
-
-            <p class="notice warning">Every operation below changes the Windows account directly on {{ activeServerProfile?.name || serverUrl }} and should include an audit reason.</p>
-
-            <div v-if="selectedUserRecord" class="selected-card">
-              <p class="metric-label">Selected account</p>
-              <strong>{{ selectedUserRecord.username }}</strong>
-              <span class="muted">{{ selectedUserRecord.full_name || 'No full name set' }}</span>
-            </div>
-
-            <div class="grid">
-              <label>
-                Username
-                <input v-model="selectedUser" placeholder="local user" />
-              </label>
-              <label>
-                New password for recovery reset
-                <input v-model="newPassword" type="password" autocomplete="new-password" />
-              </label>
-              <div class="password-meter" aria-label="Password length meter">
-                <span :style="{ width: `${Math.min(100, (newPassword.length / 12) * 100)}%` }"></span>
-              </div>
-              <p class="micro-copy">{{ passwordLengthHint }}</p>
-              <label>
-                Audit reason
-                <textarea v-model="reason" rows="3" placeholder="Owner-approved recovery reset, onboarding, role change, offboarding..."></textarea>
-              </label>
-            </div>
-
-            <div class="actions wrap">
-              <button class="danger" :disabled="loading || !canReset" @click="resetPassword">Reset password</button>
-              <button class="secondary" :disabled="loading || !selectedUser" @click="setEnabled(false)">Disable</button>
-              <button class="secondary" :disabled="loading || !selectedUser" @click="setEnabled(true)">Enable</button>
-              <button class="secondary" :disabled="loading || !selectedUser" @click="setAdministrator(true)">Grant admin</button>
-              <button class="danger" :disabled="loading || !selectedUser" @click="setAdministrator(false)">Revoke admin</button>
-            </div>
-          </article>
-
-          <article class="danger-card">
-            <div class="card-heading">
-              <div>
-                <h2>Delete account</h2>
-                <p class="muted">Requires typing the exact username before the account is removed from the active Windows server.</p>
-              </div>
-              <span class="status-pill danger">Destructive</span>
-            </div>
-
-            <p class="notice error">Deleting a user removes the local Windows account from {{ activeServerProfile?.name || serverUrl }}. Profile deletion is intentionally separated and must be enabled only after profile API handling is production-ready.</p>
-            <div class="grid">
-              <label>
-                Type selected username to confirm
-                <input v-model="deleteConfirmation" :placeholder="selectedUser || 'select a user first'" />
-              </label>
-              <label class="toggle-row"><input v-model="deleteLogoffSessions" type="checkbox" /> Log off matching active sessions first</label>
-              <label class="toggle-row"><input v-model="deleteProfile" type="checkbox" /> Request profile deletion after account removal</label>
-            </div>
-            <div class="actions">
-              <button class="danger" :disabled="loading || !canDelete" @click="deleteUser">Delete selected user</button>
-            </div>
-          </article>
-        </section>
-
-        <section class="surface-card">
-          <div class="card-heading">
-            <div>
-              <h2>Windows sessions</h2>
-              <p class="muted">Use logoff for stale or offboarding sessions on the active server before deleting or disabling an account.</p>
-            </div>
-            <span class="status-pill">{{ sessions.length }} sessions</span>
-          </div>
-
-          <div v-if="sessions.length" class="table-wrap">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>User</th>
-                  <th>State</th>
-                  <th>Client</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="session in sessions" :key="session.session_id">
-                  <td>{{ session.session_id }}</td>
-                  <td>{{ session.domain ? `${session.domain}\\${session.username || '—'}` : session.username || '—' }}</td>
-                  <td><span class="badge neutral">{{ session.state }}</span></td>
-                  <td>{{ session.client_name || (session.is_console ? 'Console' : '—') }}</td>
-                  <td><button class="secondary small" :disabled="loading || !session.username" @click="logoffSession(session.session_id)">Log off</button></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="empty-state">
-            <div>
-              <h3>No sessions loaded</h3>
-              <p>Load sessions from the active server to manage active sign-ins.</p>
-            </div>
-          </div>
-        </section>
+            </article>
+            <article class="surface-card">
+              <h2>About</h2>
+              <p class="muted">WinPassageAdmin can be installed next to WinPassageClient on the same computer.</p>
+              <button class="btn-secondary" @click="startAdminTour(true)">Replay guided tour</button>
+            </article>
+          </section>
+        </template>
       </section>
     </section>
   </main>

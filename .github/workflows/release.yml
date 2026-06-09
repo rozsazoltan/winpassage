@@ -261,6 +261,20 @@ jobs:
         with:
           install-only: true
 
+      - name: Remove stale Tauri bundle outputs
+        shell: pwsh
+        run: |
+          $paths = @(
+            ".cache/rust/packages/winpassage/target/release/bundle",
+            "apps/admin/src-tauri/target/release/bundle",
+            "apps/client/src-tauri/target/release/bundle"
+          )
+          foreach ($path in $paths) {
+            if (Test-Path $path) {
+              Remove-Item -Recurse -Force $path
+            }
+          }
+
       - name: Build ${{ matrix.app }}
         shell: bash
         run: |
