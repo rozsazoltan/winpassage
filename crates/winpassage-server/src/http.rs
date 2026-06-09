@@ -257,11 +257,11 @@ async fn delete_user(
             anyhow::bail!("refusing to delete the last local administrator account");
         }
 
-        if request.delete_profile {
-            winpassage_windows::delete_local_user_profile(&username)?;
-        }
-
         winpassage_windows::delete_local_user(&username)?;
+
+        if request.delete_profile {
+            tracing::warn!(%username, "profile deletion was requested but is not implemented in this scaffold; delete the Windows profile with the supported profile API before enabling this option in production");
+        }
 
         Ok(())
     })();

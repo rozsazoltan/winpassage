@@ -719,3 +719,47 @@ h3 {
     border-radius: 22px;
   }
 }
+
+.metric-value.compact {
+  font-size: clamp(1.05rem, 1.8vw, 1.65rem);
+  overflow-wrap: anywhere;
+}
+
+.connection-card {
+  border-color: rgb(37 99 235 / 0.18);
+}
+
+.connection-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.58);
+}
+
+.connection-summary strong {
+  display: block;
+  margin: 0.15rem 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  overflow-wrap: anywhere;
+}
+
+.settings-gate {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-gate input:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+@media (max-width: 860px) {
+  .connection-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

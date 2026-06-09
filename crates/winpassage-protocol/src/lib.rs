@@ -8,6 +8,18 @@ pub struct HealthResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerEndpointProfile {
+    pub id: String,
+    pub name: String,
+    pub network_name: String,
+    pub protocol: String,
+    pub host: String,
+    pub port: u16,
+    pub notes: Option<String>,
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalUserSummary {
     pub username: String,
     pub full_name: Option<String>,

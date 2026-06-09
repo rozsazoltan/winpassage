@@ -3,7 +3,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { computed, reactive, ref } from 'vue';
 import type { DriveMapping, PasswordChangeResponse, ReconnectMappedDrivesResponse } from './types';
 
-const serverUrl = ref(localStorage.getItem('winpassage.client.serverUrl') ?? 'http://CENTRAL-PC:4487');
+const SERVER_STORAGE_KEY = 'winpassage.client.serverUrl';
+const DEFAULT_SERVER_URL = 'http://CENTRAL-PC:4487';
+
+const serverUrl = ref(localStorage.getItem(SERVER_STORAGE_KEY) ?? DEFAULT_SERVER_URL);
 const username = ref(localStorage.getItem('winpassage.client.username') ?? '');
 const currentPassword = ref('');
 const newPassword = ref('');
@@ -12,6 +15,9 @@ const reconnectDrives = ref(true);
 const loading = ref(false);
 const message = ref('');
 const error = ref('');
+const connectionSettingsOpen = ref(false);
+const connectionUnlockInput = ref('');
+const pendingServerUrl = ref(serverUrl.value);
 
 const drives = reactive<DriveMapping[]>([
   { letter: 'S:', remote_path: localStorage.getItem('winpassage.client.drive.S') ?? '\\\\CENTRAL-PC\\Shared' },
@@ -38,19 +44,49 @@ const passwordStatus = computed(() => {
 });
 
 const configuredDriveCount = computed(() => drives.filter((drive) => drive.letter.trim() && drive.remote_path.trim()).length);
+const canEditConnection = computed(() => connectionUnlockInput.value.trim() === 'CHANGE SERVER');
+const connectionLabel = computed(() => serverUrl.value.replace(/^https?:\/\//, ''));
 
 const canSubmit = computed(() => {
   return username.value.trim().length > 0
     && currentPassword.value.length > 0
     && newPassword.value.length >= 12
-    && newPassword.value === confirmPassword.value;
+    && newPassword.value === confirmPassword.value
+    && serverUrl.value.trim().length > 0;
 });
 
+function normalizeServerUrl(value: string): string {
+  const trimmed = value.trim();
+  return (trimmed.includes('://') ? trimmed : `http://${trimmed}`).replace(/\/$/, '');
+}
+
 function persistSettings() {
-  localStorage.setItem('winpassage.client.serverUrl', serverUrl.value.replace(/\/$/, ''));
+  localStorage.setItem(SERVER_STORAGE_KEY, normalizeServerUrl(serverUrl.value));
   localStorage.setItem('winpassage.client.username', username.value.trim());
   for (const drive of drives) {
     localStorage.setItem(`winpassage.client.drive.${drive.letter.replace(':', '')}`, drive.remote_path);
+  }
+}
+
+function openConnectionSettings() {
+  connectionSettingsOpen.value = true;
+  pendingServerUrl.value = serverUrl.value;
+  connectionUnlockInput.value = '';
+}
+
+function saveConnectionSettings() {
+  if (!canEditConnection.value) return;
+
+  try {
+    serverUrl.value = normalizeServerUrl(pendingServerUrl.value);
+    new URL(serverUrl.value);
+    persistSettings();
+    connectionSettingsOpen.value = false;
+    connectionUnlockInput.value = '';
+    message.value = 'Server address updated. Use this only when IT or the network administrator gives you a new address.';
+    error.value = '';
+  } catch {
+    error.value = 'Invalid server address. Use an address such as http://192.168.1.10:4487.';
   }
 }
 
@@ -61,7 +97,7 @@ async function changePassword() {
   persistSettings();
 
   try {
-    const response = await fetch(`${serverUrl.value.replace(/\/$/, '')}/v1/me/password/change`, {
+    const response = await fetch(`${normalizeServerUrl(serverUrl.value)}/v1/me/password/change`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -154,6 +190,11 @@ async function changePassword() {
 
         <section class="metric-grid" aria-label="Workflow status">
           <article class="metric-card">
+            <p class="metric-label">Central server</p>
+            <p class="metric-value compact">{{ connectionLabel }}</p>
+            <p class="metric-hint">Configured by IT or the installer</p>
+          </article>
+          <article class="metric-card">
             <p class="metric-label">Account</p>
             <p class="metric-value">{{ username || '—' }}</p>
             <p class="metric-hint">Central Windows username</p>
@@ -168,11 +209,41 @@ async function changePassword() {
             <p class="metric-value">{{ configuredDriveCount }}</p>
             <p class="metric-hint">Configured for reconnect</p>
           </article>
-          <article class="metric-card">
-            <p class="metric-label">Ready</p>
-            <p class="metric-value">{{ canSubmit ? 'Yes' : 'No' }}</p>
-            <p class="metric-hint">All required fields valid</p>
-          </article>
+        </section>
+
+        <section class="surface-card connection-card">
+          <div class="card-heading">
+            <div>
+              <h2>Connection</h2>
+              <p class="muted">The central server address is intentionally not part of the normal password form to prevent accidental changes.</p>
+            </div>
+            <span class="status-pill">{{ connectionLabel }}</span>
+          </div>
+
+          <div v-if="!connectionSettingsOpen" class="connection-summary">
+            <div>
+              <p class="metric-label">Current server</p>
+              <strong>{{ serverUrl }}</strong>
+              <p class="muted">Ask IT or the network administrator before changing this value.</p>
+            </div>
+            <button class="secondary" @click="openConnectionSettings">Advanced connection settings</button>
+          </div>
+
+          <div v-else class="settings-gate">
+            <p class="notice warning">Changing the server address may prevent password changes and mapped drive reconnect. Continue only if IT gave you the new address.</p>
+            <label>
+              Type CHANGE SERVER to unlock
+              <input v-model="connectionUnlockInput" autocomplete="off" placeholder="CHANGE SERVER" />
+            </label>
+            <label>
+              Server URL or IP address
+              <input v-model="pendingServerUrl" :disabled="!canEditConnection" placeholder="http://192.168.1.10:4487" />
+            </label>
+            <div class="actions">
+              <button :disabled="!canEditConnection" @click="saveConnectionSettings">Save server address</button>
+              <button class="secondary" @click="connectionSettingsOpen = false">Cancel</button>
+            </div>
+          </div>
         </section>
 
         <section class="panel-grid reverse">
@@ -186,10 +257,6 @@ async function changePassword() {
             </div>
 
             <div class="grid two">
-              <label>
-                Server URL
-                <input v-model="serverUrl" placeholder="http://CENTRAL-PC:4487" />
-              </label>
               <label>
                 Username
                 <input v-model="username" autocomplete="username" placeholder="your central username" />
@@ -279,10 +346,10 @@ async function changePassword() {
           </div>
 
           <div class="form-footer">
-            <p class="micro-copy">Only server URL, username, and drive paths are stored locally.</p>
+            <p class="micro-copy">Only server URL, username, and drive paths are stored locally. Current and new passwords are never saved.</p>
             <div class="actions">
               <button :disabled="loading || !canSubmit" @click="changePassword">Change password</button>
-              <button class="secondary" :disabled="loading" @click="persistSettings">Save settings</button>
+              <button class="secondary" :disabled="loading" @click="persistSettings">Save username & drives</button>
             </div>
           </div>
         </section>

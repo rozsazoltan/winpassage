@@ -19,7 +19,9 @@ Unsupported model:
 - unauthenticated API access;
 - shared admin tokens in chat or documents;
 - normal users calling admin reset endpoints;
-- password values in URL query strings, command-line arguments, or logs.
+- password values in URL query strings, command-line arguments, or logs;
+- silent or accidental client-side server switching by regular users;
+- treating admin server profiles as centralized identity inventory.
 
 ## Reporting vulnerabilities
 
@@ -38,6 +40,13 @@ WinPassage can grant or revoke membership in the local Administrators group. Tre
 
 Session logoff can interrupt active work. Use it only for owner-approved offboarding, stale sessions, or recovery workflows. Audit entries must include the target session and the operator reason, but never any password value.
 
-## Profile deletion
 
-Account deletion and profile deletion are separate high-impact actions. Profile deletion uses Windows profile APIs and should be used only after active sessions are logged off and the operator has confirmed that local profile data is no longer required.
+## Multiple standalone servers
+
+Admin server profiles are convenience shortcuts for trusted operators. They should contain only non-secret connection metadata and should not store Windows users or plaintext admin credentials. Each selected server remains an independent Windows authority.
+
+Before running privileged actions, the UI must make the active server visible enough that an operator can confirm the correct network and IP address.
+
+## Client connection settings
+
+The client app should display the configured server address but keep editing behind an advanced confirmation flow. This reduces accidental misconfiguration for regular users and prevents support issues where password changes are sent to the wrong central machine.

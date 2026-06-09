@@ -1,3 +1,13 @@
+export interface ServerProfile {
+  id: string;
+  name: string;
+  network_name: string;
+  protocol: 'http' | 'https';
+  host: string;
+  port: number;
+  notes: string | null;
+}
+
 export interface LocalUserSummary {
   username: string;
   full_name: string | null;

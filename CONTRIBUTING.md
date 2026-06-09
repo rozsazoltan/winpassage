@@ -7,6 +7,7 @@ Contributor and operator setup notes for the WinPassage monorepo.
 - [Local development](#local-development)
 - [Windows service setup](#windows-service-setup)
 - [Local network configuration](#local-network-configuration)
+- [Multi-server admin profiles](#multi-server-admin-profiles)
 - [Testing](#testing)
 - [GitHub Actions](#github-actions)
 - [Release workflow](#release-workflow)
@@ -41,6 +42,8 @@ Use these boundaries:
 - `crates/winpassage-agentctl`: service install/start/stop helper.
 
 Do not put Windows password logic in the frontend. The server service owns local-user password changes. The client app only handles self-service UI and mapped drive reconnect after a successful server response.
+
+The admin app may store local server profiles for multiple standalone WinPassage servers. These profiles are connection shortcuts only; they must not duplicate Windows users or become a second source of truth.
 
 ## Local development
 
@@ -136,6 +139,26 @@ Check the agent after start:
 ```powershell
 Invoke-RestMethod http://localhost:4487/health
 ```
+
+## Multi-server admin profiles
+
+Use the admin app's server registry when one operator manages multiple independent Windows Pro central machines. Add one profile per machine:
+
+```text
+Name: Office server
+Network: Budapest office
+IP/DNS: 192.168.1.10
+Port: 4487
+Protocol: http or https
+```
+
+Development expectations:
+
+- selecting a profile must update the active server URL;
+- switching profiles should clear loaded users and sessions;
+- profiles must not store Windows users, passwords, or long-lived admin tokens;
+- the selected profile must be visible before privileged operations;
+- client server settings must stay behind an advanced confirmation flow.
 
 ## Testing
 

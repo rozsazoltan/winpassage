@@ -13,9 +13,11 @@ It provides a Windows background agent, an admin desktop app, and a client deskt
   - [What it is not](#what-it-is-not)
 - [Get started](#get-started)
   - [Server machine](#server-machine)
+  - [Multiple central machines](#multiple-central-machines)
   - [Admin app](#admin-app)
   - [Client app](#client-app)
 - [Usage](#usage)
+  - [Account lifecycle management](#account-lifecycle-management)
   - [Admin password reset](#admin-password-reset)
   - [Self-service password change](#self-service-password-change)
   - [Mapped drives](#mapped-drives)
@@ -45,6 +47,9 @@ WinPassage adds a controlled password-change layer around that central Windows P
 The central machine runs `winpassage-server.exe` as a Windows Service. It exposes a restricted local-network API for:
 
 - listing local Windows users for admins;
+- creating, disabling, deleting, and managing local Windows users;
+- granting and revoking local administrator access;
+- listing and logging off Windows sessions for offboarding;
 - resetting local user passwords from the admin app;
 - allowing users to change only their own password by providing the current password;
 - writing audit events without logging secrets.
@@ -130,18 +135,42 @@ Expected response:
 }
 ```
 
+### Multiple central machines
+
+A single `WinPassage Admin` installation can keep local shortcuts for multiple standalone WinPassage servers. This is useful when one operator manages several small networks, branches, workshops, or office rooms where each location has its own Windows Pro central machine.
+
+Each server profile contains only connection metadata:
+
+```text
+Display name
+Network or location name
+IP address or DNS name
+Port
+Protocol
+Operator notes
+```
+
+The profile does not store Windows users and should not store admin passwords. User lists, sessions, administrator status, and account changes are always loaded from the selected Windows machine at request time.
+
+> [!IMPORTANT]
+> Treat each server as a separate authority. Switching the active profile changes which Windows machine receives user-management actions. Verify the selected server before creating, deleting, disabling, or resetting users.
+
 ### Admin app
 
 Install `WinPassage Admin` on the central machine or an administrator workstation.
 
-Open the app and set:
+Open the app and register one or more server profiles:
 
 ```text
-Server URL:  http://CENTRAL-PC:4487
+Name:        Office server
+Network:     Budapest office
+IP/DNS:      192.168.1.10
+Port:        4487
+Protocol:    http or https
 Admin token: the value from WINPASSAGE_ADMIN_TOKEN
 ```
 
-Use **Load users** to list local users on the central machine. Select a user, type a new password, add a reason, and run **Reset password**.
+Use **Load users & sessions** to list users and sessions from the selected server. Select a user, type a new password, add a reason, and run **Reset password**. The active server is shown in the dashboard because every operation changes the selected Windows machine directly.
 
 > [!WARNING]
 > Admin reset does not require the user's current password. Use it only for administrator-controlled recovery, onboarding, and emergency flows. Regular users should use the client app.
@@ -150,10 +179,11 @@ Use **Load users** to list local users on the central machine. Select a user, ty
 
 Install `WinPassage Client` on each workstation that maps shared drives from the central machine.
 
-The user enters:
+The server address is configured during deployment or support. It is shown to the user, but its modification is kept behind **Advanced connection settings** so regular users do not accidentally point the app at the wrong machine.
+
+For normal use, the user enters:
 
 ```text
-Server URL
 Username
 Current password
 New password
@@ -172,6 +202,29 @@ G: -> \\CENTRAL-PC\Groups
 
 ## Usage
 
+### Account lifecycle management
+
+WinPassage reads the current local Windows accounts from the selected central machine. It does not keep a separate user database and does not try to mirror Windows users into application storage.
+
+The admin console is designed to support these local Windows account operations:
+
+```text
+- list current local Windows users
+- create a local user
+- delete a local user
+- enable or disable a local user
+- reset a user's password as an administrator
+- grant or revoke local administrator access
+- list active Windows sessions
+- log off a selected session before offboarding or account deletion
+```
+
+> [!WARNING]
+> User creation, deletion, administrator grants, administrator revokes, and session logoff are privileged Windows operations. Use a dedicated test account first and keep the service reachable only from a trusted private network, VPN, or mTLS-protected admin channel.
+
+> [!IMPORTANT]
+> The local Administrators group is resolved through the built-in Administrators SID where possible. The UI should display administrator access as a capability, not as a localized group name.
+
 ### Admin password reset
 
 Use the admin app when the administrator needs to set a new password for a local user without knowing the old one.
@@ -187,7 +240,7 @@ $body = @{
 
 Invoke-RestMethod `
   -Method Post `
-  -Uri "http://CENTRAL-PC:4487/v1/admin/users/julia/password/reset" `
+  -Uri "http://CENTRAL-PC:4487/v1/users/julia/password/reset" `
   -Headers @{ Authorization = "Bearer replace-with-a-long-random-token" } `
   -ContentType "application/json" `
   -Body $body
@@ -289,7 +342,9 @@ WinPassage follows these rules:
 - passwords are not logged;
 - mapped drive reconnect happens only after server-confirmed password change;
 - generated audit records avoid secrets;
-- the API is intended for private LAN or VPN use.
+- the API is intended for private LAN or VPN use;
+- admin server profiles are connection shortcuts, not an application user database;
+- client server address changes are intentionally hidden behind an advanced confirmation flow.
 
 Recommended production controls:
 
@@ -319,11 +374,26 @@ The server reads configuration from environment variables.
 > [!TIP]
 > Use Windows system environment variables for the service account context. Restart the service after changing them.
 
+Admin and client app settings are local workstation settings:
+
+| Setting | Stored by | Secret? | Notes |
+|---|---|---:|---|
+| Server profiles | Admin app | No | Display name, network name, IP/DNS, port, protocol, notes. |
+| Active server | Admin app | No | Determines which standalone Windows machine receives admin actions. |
+| Server URL | Client app | No | Hidden behind advanced connection settings to avoid accidental changes. |
+| Username and drive paths | Client app | No | Stored only for user convenience. |
+| Admin token | Admin app | Yes | Session-only by default; do not store without secure storage. |
+| Passwords | Neither app | Yes | Never stored. |
+
 ## Known Issues
 
 ### Windows Pro is not Windows Server
 
 A Windows 11 Pro central machine is practical for very small networks, but it is not built for larger file-service workloads. For more than 20 accessing devices, use a server-grade setup.
+
+### Server profiles are local shortcuts
+
+The admin app can remember multiple server profiles, but those profiles do not create federation, synchronization, replication, or shared identity between servers. Each Windows Pro machine remains independent.
 
 ### Local accounts only
 
@@ -344,31 +414,6 @@ WinPassage helps with audit-friendly password change workflows, but NIS2, ISO 27
 ## Contributing
 
 See: `CONTRIBUTING.md`.
-
-
-
-### Account lifecycle management
-
-WinPassage reads the current local Windows accounts from the central machine. It does not keep a separate user database and does not try to mirror Windows users into application storage.
-
-The admin console is designed to support these local Windows account operations:
-
-```text
-- list current local Windows users
-- create a local user
-- delete a local user
-- enable or disable a local user
-- reset a user's password as an administrator
-- grant or revoke local administrator access
-- list active Windows sessions
-- log off a selected session before offboarding or account deletion
-```
-
-> [!WARNING]
-> User creation, deletion, administrator grants, administrator revokes, and session logoff are privileged Windows operations. Use a dedicated test account first and keep the service reachable only from a trusted private network, VPN, or mTLS-protected admin channel.
-
-> [!IMPORTANT]
-> The local Administrators group is resolved through the built-in Administrators SID where possible. The UI should display administrator access as a capability, not as a localized group name.
 
 
 ## License & Acknowledgments

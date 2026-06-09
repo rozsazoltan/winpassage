@@ -4,6 +4,11 @@ export interface PasswordChangeResponse {
   request_id: string;
 }
 
+export interface ClientServerSettings {
+  server_url: string;
+  locked: boolean;
+}
+
 export interface DriveMapping {
   letter: string;
   remote_path: string;

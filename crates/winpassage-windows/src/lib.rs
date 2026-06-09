@@ -1,7 +1,6 @@
 pub mod local_groups;
 pub mod local_users;
 pub mod mapped_drives;
-pub mod profiles;
 pub mod sessions;
 
 use anyhow::Result;
@@ -16,7 +15,6 @@ pub use local_users::{
     set_local_user_enabled,
 };
 pub use mapped_drives::{list_mapped_drives, reconnect_mapped_drives};
-pub use profiles::delete_local_user_profile;
 pub use sessions::{active_session_count_for_user, list_sessions, logoff_session};
 
 pub fn list_local_users() -> Result<Vec<LocalUserSummary>> {

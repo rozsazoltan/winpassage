@@ -16,6 +16,8 @@ Preserve these positioning rules:
 - The admin app supports owner-approved administrator password reset flows.
 - The project can support NIS2-style cyber hygiene and audit processes, but must never claim to make an organization compliant by itself.
 - The project must remain explicit about Windows Pro connection limits, licensing limits, and small-network scope.
+- The admin app may manage multiple standalone WinPassage servers, but each server remains independent and Windows remains the source of truth for that server.
+- The client app must show the configured server address while making accidental server changes difficult for regular users.
 
 ## Repository map
 
@@ -114,14 +116,17 @@ Do not duplicate HTTP server behavior here.
 
 ### `apps/admin`
 
-The admin app is a Tauri 2 UI for trusted operators. It may list users and trigger administrator password reset through the server API.
+The admin app is a Tauri 2 UI for trusted operators. It may list users and trigger account lifecycle actions through the selected server API.
+
+It may keep local server profiles for multiple standalone central machines. A server profile is only connection metadata: display name, network/location label, IP address or DNS name, port, protocol, and operator notes. It is not a user database and must not imply synchronization between servers.
 
 It must:
 
 - visually separate normal actions from dangerous actions;
-- display audit-oriented context such as request ID, reason, and selected user;
+- make the active server/profile obvious before every privileged operation;
+- display audit-oriented context such as request ID, reason, selected user, and selected server;
 - keep admin secrets session-scoped unless a secure storage design is intentionally added;
-- avoid storing passwords.
+- avoid storing passwords or long-lived admin tokens in plain localStorage.
 
 ### `apps/client`
 
@@ -133,12 +138,29 @@ It may:
 - reconnect configured mapped drives after the server confirms success;
 - store non-secret settings such as server URL, username, and drive mappings.
 
+The configured server address should be visible but not casually editable. Keep it behind advanced connection settings, an explicit confirmation phrase, or a future administrator-managed configuration flow. Accidental server changes can break password changes and drive reconnect for non-technical users.
+
 It must not:
 
 - call admin reset endpoints;
 - let a user reset another user's password;
 - store current or new passwords;
-- reconnect drives until the password change is confirmed by the server.
+- reconnect drives until the password change is confirmed by the server;
+- hide which server will receive the password change request.
+
+## Multi-server and network profile rules
+
+WinPassage can support multiple standalone central machines from one admin console, but this must remain a UI/operator convenience.
+
+Rules:
+
+- A server profile belongs to the admin app, not the server.
+- A server profile must contain connection metadata only.
+- Admin tokens must stay session-only unless secure storage is explicitly implemented.
+- Switching the active server must clear loaded users/sessions to avoid acting on stale data.
+- Every destructive or privileged operation must make the active server visible in the UI.
+- Do not add cross-server user synchronization, replication, or shared identity unless the architecture is redesigned and documented.
+- The client app should normally have one configured server address and should not present server switching as a regular-user task.
 
 ## Security rules
 
@@ -147,6 +169,8 @@ These rules are mandatory.
 - Never log plaintext passwords.
 - Never put passwords in URLs, query strings, panic messages, debug output, telemetry, audit logs, or command-line arguments.
 - Do not add a normal-client workflow that can reset another user's password.
+- Do not treat server profiles as trusted inventory from the server. They are local admin UI shortcuts unless a signed provisioning design is added.
+- Do not make client server switching too easy; use progressive disclosure and explicit confirmation.
 - Do not make public-internet exposure sound safe. Recommend VPN, firewall allowlists, TLS/mTLS, or localhost proxying.
 - Do not weaken password validation without a clearly documented reason.
 - Do not silently ignore failed drive reconnect operations.
@@ -175,6 +199,8 @@ Design principles:
 
 Implementation notes:
 
+- Multi-server administration should use clear active-server cards and profile badges.
+- Client connection settings should use progressive disclosure and a confirmation gate such as typing `CHANGE SERVER`.
 - Shared visual language currently lives in each app's `src/styles.css`.
 - Use semantic classes such as `app-shell`, `side-rail`, `workspace`, `hero-panel`, `metric-card`, `surface-card`, `danger-card`, `status-pill`, and `notice`.
 - Do not use random decorative icons that obscure meaning. Labels must stand on their own.

@@ -756,3 +756,77 @@ button.small {
   color: #334155;
   background: #e2e8f0;
 }
+
+.metric-value.compact {
+  font-size: clamp(1.15rem, 2vw, 1.8rem);
+  overflow-wrap: anywhere;
+}
+
+.grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0.9rem 0.95rem;
+  background: rgb(255 255 255 / 0.8);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  outline: none;
+}
+
+select:focus {
+  border-color: rgb(37 99 235 / 0.55);
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 0.12);
+}
+
+.server-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.server-card {
+  display: grid;
+  gap: 1rem;
+  align-content: space-between;
+  min-height: 210px;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.74), rgb(248 250 252 / 0.66));
+  box-shadow: 0 18px 50px rgb(15 23 42 / 0.08);
+}
+
+.server-card.active {
+  border-color: rgb(37 99 235 / 0.42);
+  box-shadow: 0 22px 70px rgb(37 99 235 / 0.14);
+}
+
+.server-card h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.1rem;
+}
+
+.server-address {
+  margin: 0.55rem 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: var(--brand-strong);
+  overflow-wrap: anywhere;
+}
+
+.server-form {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 860px) {
+  .grid.three {
+    grid-template-columns: 1fr;
+  }
+}

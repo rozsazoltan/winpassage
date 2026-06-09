@@ -1,8 +1,56 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { ActionResponse, ListSessionsResponse, ListUsersResponse, LocalSessionSummary, LocalUserSummary } from './types';
+import type {
+  ActionResponse,
+  ListSessionsResponse,
+  ListUsersResponse,
+  LocalSessionSummary,
+  LocalUserSummary,
+  ServerProfile,
+} from './types';
 
-const serverUrl = ref(localStorage.getItem('winpassage.admin.serverUrl') ?? 'http://localhost:4487');
+const PROFILE_STORAGE_KEY = 'winpassage.admin.serverProfiles';
+const ACTIVE_PROFILE_KEY = 'winpassage.admin.activeServerId';
+
+function defaultServerProfiles(): ServerProfile[] {
+  return [
+    {
+      id: 'local-dev',
+      name: 'Local development',
+      network_name: 'Local machine',
+      protocol: 'http',
+      host: 'localhost',
+      port: 4487,
+      notes: 'Default local WinPassage server profile.',
+    },
+  ];
+}
+
+function loadServerProfiles(): ServerProfile[] {
+  const stored = localStorage.getItem(PROFILE_STORAGE_KEY);
+  if (!stored) return defaultServerProfiles();
+
+  try {
+    const parsed = JSON.parse(stored) as ServerProfile[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultServerProfiles();
+  } catch {
+    return defaultServerProfiles();
+  }
+}
+
+function profileUrl(profile: ServerProfile): string {
+  return `${profile.protocol}://${profile.host}:${profile.port}`;
+}
+
+function normalizeUrl(value: string): URL {
+  const trimmed = value.trim();
+  return new URL(trimmed.includes('://') ? trimmed : `http://${trimmed}`);
+}
+
+const serverProfiles = ref<ServerProfile[]>(loadServerProfiles());
+const activeServerId = ref(localStorage.getItem(ACTIVE_PROFILE_KEY) ?? serverProfiles.value[0]?.id ?? 'local-dev');
+const activeServerProfile = computed(() => serverProfiles.value.find((profile) => profile.id === activeServerId.value) ?? serverProfiles.value[0]);
+const serverUrl = ref(activeServerProfile.value ? profileUrl(activeServerProfile.value) : 'http://localhost:4487');
 const adminToken = ref('');
 const users = ref<LocalUserSummary[]>([]);
 const sessions = ref<LocalSessionSummary[]>([]);
@@ -12,6 +60,13 @@ const reason = ref('');
 const loading = ref(false);
 const message = ref('');
 const error = ref('');
+
+const newServerName = ref('');
+const newServerNetwork = ref('');
+const newServerHost = ref('');
+const newServerPort = ref(4487);
+const newServerProtocol = ref<'http' | 'https'>('http');
+const newServerNotes = ref('');
 
 const createUsername = ref('');
 const createFullName = ref('');
@@ -25,18 +80,85 @@ const deleteLogoffSessions = ref(true);
 const deleteProfile = ref(false);
 
 const enabledUsers = computed(() => users.value.filter((user) => !user.disabled).length);
-const disabledUsers = computed(() => users.value.filter((user) => user.disabled).length);
 const adminUsers = computed(() => users.value.filter((user) => user.is_administrator).length);
 const activeSessions = computed(() => sessions.value.filter((session) => session.username).length);
 const selectedUserRecord = computed(() => users.value.find((user) => user.username === selectedUser.value) ?? null);
-const selectedUserSessions = computed(() => sessions.value.filter((session) => session.username?.toLowerCase() === selectedUser.value.toLowerCase()));
 const passwordLengthHint = computed(() => `${newPassword.value.length}/12 minimum characters`);
 const canReset = computed(() => selectedUser.value.length > 0 && newPassword.value.length >= 12 && adminToken.value.length > 0);
 const canCreate = computed(() => createUsername.value.length > 0 && createPassword.value.length >= 12 && adminToken.value.length > 0);
 const canDelete = computed(() => selectedUser.value.length > 0 && deleteConfirmation.value === selectedUser.value && adminToken.value.length > 0);
+const canAddServer = computed(() => newServerName.value.trim().length > 0 && newServerHost.value.trim().length > 0 && Number(newServerPort.value) > 0);
+
+function persistProfiles() {
+  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(serverProfiles.value));
+  localStorage.setItem(ACTIVE_PROFILE_KEY, activeServerId.value);
+}
 
 function persistSettings() {
-  localStorage.setItem('winpassage.admin.serverUrl', serverUrl.value.replace(/\/$/, ''));
+  syncActiveProfileFromServerUrl();
+  persistProfiles();
+}
+
+function selectServerProfile(profile: ServerProfile) {
+  activeServerId.value = profile.id;
+  serverUrl.value = profileUrl(profile);
+  users.value = [];
+  sessions.value = [];
+  selectedUser.value = '';
+  persistProfiles();
+}
+
+function addServerProfile() {
+  if (!canAddServer.value) return;
+
+  const profile: ServerProfile = {
+    id: crypto.randomUUID(),
+    name: newServerName.value.trim(),
+    network_name: newServerNetwork.value.trim() || 'Unspecified network',
+    protocol: newServerProtocol.value,
+    host: newServerHost.value.trim(),
+    port: Number(newServerPort.value),
+    notes: newServerNotes.value.trim() || null,
+  };
+
+  serverProfiles.value.push(profile);
+  newServerName.value = '';
+  newServerNetwork.value = '';
+  newServerHost.value = '';
+  newServerPort.value = 4487;
+  newServerProtocol.value = 'http';
+  newServerNotes.value = '';
+  selectServerProfile(profile);
+  message.value = `Added server profile ${profile.name}.`;
+}
+
+function removeServerProfile(profile: ServerProfile) {
+  if (serverProfiles.value.length <= 1) {
+    error.value = 'At least one server profile must remain.';
+    return;
+  }
+
+  serverProfiles.value = serverProfiles.value.filter((item) => item.id !== profile.id);
+  if (activeServerId.value === profile.id) {
+    selectServerProfile(serverProfiles.value[0]);
+  }
+  persistProfiles();
+  message.value = `Removed server profile ${profile.name}.`;
+}
+
+function syncActiveProfileFromServerUrl() {
+  const profile = activeServerProfile.value;
+  if (!profile) return;
+
+  try {
+    const url = normalizeUrl(serverUrl.value);
+    profile.protocol = url.protocol === 'https:' ? 'https' : 'http';
+    profile.host = url.hostname;
+    profile.port = Number(url.port || (profile.protocol === 'https' ? 443 : 80));
+    serverUrl.value = profileUrl(profile);
+  } catch {
+    error.value = 'Invalid server URL. Use an address such as http://192.168.1.10:4487.';
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -80,7 +202,7 @@ async function loadUsers(showMessage = true) {
   const payload = await request<ListUsersResponse>('/v1/users');
   users.value = payload.users;
   if (showMessage) {
-    message.value = `Loaded ${payload.users.length} local Windows accounts.`;
+    message.value = `Loaded ${payload.users.length} local Windows accounts from ${activeServerProfile.value?.name ?? serverUrl.value}.`;
   }
 }
 
@@ -88,7 +210,7 @@ async function loadSessions(showMessage = true) {
   const payload = await request<ListSessionsResponse>('/v1/sessions');
   sessions.value = payload.sessions;
   if (showMessage) {
-    message.value = `Loaded ${payload.sessions.length} Windows sessions.`;
+    message.value = `Loaded ${payload.sessions.length} Windows sessions from ${activeServerProfile.value?.name ?? serverUrl.value}.`;
   }
 }
 
@@ -100,7 +222,7 @@ async function refreshAll() {
     ]);
     users.value = userPayload.users;
     sessions.value = sessionPayload.sessions;
-    return `Loaded ${userPayload.users.length} users and ${sessionPayload.sessions.length} sessions.`;
+    return `Loaded ${userPayload.users.length} users and ${sessionPayload.sessions.length} sessions from ${activeServerProfile.value?.name ?? serverUrl.value}.`;
   }, false);
 }
 
@@ -220,6 +342,7 @@ async function deleteUser() {
 
         <nav class="rail-menu" aria-label="Workspace sections">
           <span class="rail-item active"><span class="rail-dot"></span>Overview</span>
+          <span class="rail-item">Networks</span>
           <span class="rail-item">Users</span>
           <span class="rail-item">Access</span>
           <span class="rail-item">Sessions</span>
@@ -228,7 +351,7 @@ async function deleteUser() {
 
         <div class="rail-footer">
           <p class="metric-label">Security note</p>
-          <p class="muted">This console changes real local Windows accounts. Use only from trusted admin workstations.</p>
+          <p class="muted">Server profiles are local admin-console settings. Windows users are always read from the selected server.</p>
         </div>
       </aside>
 
@@ -236,35 +359,35 @@ async function deleteUser() {
         <header class="hero-panel">
           <div class="hero-grid">
             <div>
-              <p class="eyebrow">Windows Pro central machine</p>
-              <h1>Local Windows user management without domain overhead.</h1>
+              <p class="eyebrow">Windows Pro central machines</p>
+              <h1>Manage separate local networks from one trusted console.</h1>
               <p class="lead">
-                Read the current local accounts directly from Windows, create or remove users, manage administrator access, and log off active sessions with audit-friendly operator reasons.
+                Register each central Windows Pro machine by IP address or DNS name, switch between networks, and manage the selected server's real local Windows accounts.
               </p>
             </div>
             <div class="status-stack">
               <span class="status-pill success">Windows source of truth</span>
-              <span class="status-pill warning">Privileged actions</span>
+              <span class="status-pill warning">Per-server actions</span>
               <span class="status-pill">EU small networks</span>
             </div>
           </div>
         </header>
 
-        <section class="metric-grid" aria-label="User statistics">
+        <section class="metric-grid" aria-label="Server and user statistics">
+          <article class="metric-card">
+            <p class="metric-label">Server profiles</p>
+            <p class="metric-value">{{ serverProfiles.length }}</p>
+            <p class="metric-hint">Separate central machines</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Active server</p>
+            <p class="metric-value compact">{{ activeServerProfile?.name || '—' }}</p>
+            <p class="metric-hint">{{ serverUrl }}</p>
+          </article>
           <article class="metric-card">
             <p class="metric-label">Loaded users</p>
             <p class="metric-value">{{ users.length }}</p>
             <p class="metric-hint">Current Windows accounts</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">Enabled</p>
-            <p class="metric-value">{{ enabledUsers }}</p>
-            <p class="metric-hint">Allowed to sign in</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">Administrators</p>
-            <p class="metric-value">{{ adminUsers }}</p>
-            <p class="metric-hint">Local admin group</p>
           </article>
           <article class="metric-card">
             <p class="metric-label">Sessions</p>
@@ -276,15 +399,79 @@ async function deleteUser() {
         <section class="surface-card">
           <div class="card-heading">
             <div>
+              <h2>Server registry</h2>
+              <p class="muted">Add every standalone WinPassage server machine by IP address or stable DNS name. These profiles are only admin-console shortcuts.</p>
+            </div>
+            <span class="status-pill">{{ activeServerProfile?.network_name || 'No network' }}</span>
+          </div>
+
+          <div class="server-grid">
+            <article
+              v-for="profile in serverProfiles"
+              :key="profile.id"
+              class="server-card"
+              :class="{ active: profile.id === activeServerId }"
+            >
+              <div>
+                <p class="metric-label">{{ profile.network_name }}</p>
+                <h3>{{ profile.name }}</h3>
+                <p class="server-address">{{ profileUrl(profile) }}</p>
+                <p class="muted">{{ profile.notes || 'Standalone Windows Pro server profile.' }}</p>
+              </div>
+              <div class="actions wrap">
+                <button class="secondary small" :disabled="profile.id === activeServerId" @click="selectServerProfile(profile)">Use</button>
+                <button class="danger small" :disabled="serverProfiles.length <= 1" @click="removeServerProfile(profile)">Remove</button>
+              </div>
+            </article>
+          </div>
+
+          <div class="grid three server-form">
+            <label>
+              Name
+              <input v-model="newServerName" placeholder="Office server" />
+            </label>
+            <label>
+              Network
+              <input v-model="newServerNetwork" placeholder="Budapest office" />
+            </label>
+            <label>
+              IP address or DNS name
+              <input v-model="newServerHost" placeholder="192.168.1.10" />
+            </label>
+            <label>
+              Protocol
+              <select v-model="newServerProtocol">
+                <option value="http">http</option>
+                <option value="https">https</option>
+              </select>
+            </label>
+            <label>
+              Port
+              <input v-model.number="newServerPort" type="number" min="1" max="65535" />
+            </label>
+            <label>
+              Notes
+              <input v-model="newServerNotes" placeholder="Optional operator note" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button :disabled="!canAddServer" @click="addServerProfile">Add server profile</button>
+          </div>
+        </section>
+
+        <section class="surface-card">
+          <div class="card-heading">
+            <div>
               <h2>Connection</h2>
-              <p class="muted">Connect to the WinPassage service on the central Windows Pro machine.</p>
+              <p class="muted">Connect to the selected WinPassage service. Admin tokens stay session-only and are not stored with the server profile.</p>
             </div>
             <span class="status-pill" :class="adminToken ? 'success' : 'warning'">{{ adminToken ? 'Token provided' : 'Token required' }}</span>
           </div>
           <div class="grid two">
             <label>
-              Server URL
-              <input v-model="serverUrl" placeholder="http://CENTRAL-PC:4487" />
+              Active server URL
+              <input v-model="serverUrl" placeholder="http://192.168.1.10:4487" />
             </label>
             <label>
               Admin token
@@ -293,7 +480,7 @@ async function deleteUser() {
           </div>
           <div class="actions">
             <button :disabled="loading || !adminToken" @click="refreshAll">Load users & sessions</button>
-            <button class="secondary" :disabled="loading" @click="persistSettings">Save server URL</button>
+            <button class="secondary" :disabled="loading" @click="persistSettings">Save active server address</button>
           </div>
         </section>
 
@@ -305,7 +492,7 @@ async function deleteUser() {
             <div class="card-heading">
               <div>
                 <h2>Local users</h2>
-                <p class="muted">The list is loaded from the central machine's local Windows accounts, not from a WinPassage database.</p>
+                <p class="muted">The list is loaded from the selected server's local Windows accounts, not from a WinPassage database.</p>
               </div>
               <span class="status-pill">{{ selectedUser || 'No selection' }}</span>
             </div>
@@ -350,7 +537,7 @@ async function deleteUser() {
             <div v-else class="empty-state">
               <div>
                 <h3>No users loaded</h3>
-                <p>Enter the admin token, then load local users from the central machine.</p>
+                <p>Select a server profile, enter the admin token, then load local users from that machine.</p>
               </div>
             </div>
           </article>
@@ -359,7 +546,7 @@ async function deleteUser() {
             <div class="card-heading">
               <div>
                 <h2>Create local account</h2>
-                <p class="muted">Creates a real Windows local user on the central machine.</p>
+                <p class="muted">Creates a real Windows local user on the active central machine.</p>
               </div>
               <span class="status-pill warning">Admin action</span>
             </div>
@@ -388,7 +575,7 @@ async function deleteUser() {
               <label class="toggle-row"><input v-model="createAdmin" type="checkbox" /> Add to local Administrators group</label>
             </div>
             <div class="actions">
-              <button :disabled="loading || !canCreate" @click="createUser">Create user</button>
+              <button :disabled="loading || !canCreate" @click="createUser">Create user on active server</button>
             </div>
           </article>
         </section>
@@ -398,12 +585,12 @@ async function deleteUser() {
             <div class="card-heading">
               <div>
                 <h2>Account control</h2>
-                <p class="muted">Change status, reset password, and manage administrator access for the selected user.</p>
+                <p class="muted">Change status, reset password, and manage administrator access for the selected user on the active server.</p>
               </div>
               <span class="status-pill danger">Privileged</span>
             </div>
 
-            <p class="notice warning">Every operation below changes the Windows account directly and should include an audit reason.</p>
+            <p class="notice warning">Every operation below changes the Windows account directly on {{ activeServerProfile?.name || serverUrl }} and should include an audit reason.</p>
 
             <div v-if="selectedUserRecord" class="selected-card">
               <p class="metric-label">Selected account</p>
@@ -443,12 +630,12 @@ async function deleteUser() {
             <div class="card-heading">
               <div>
                 <h2>Delete account</h2>
-                <p class="muted">Requires typing the exact username before the account is removed from Windows.</p>
+                <p class="muted">Requires typing the exact username before the account is removed from the active Windows server.</p>
               </div>
               <span class="status-pill danger">Destructive</span>
             </div>
 
-            <p class="notice error">Deleting a user removes the local Windows account. Profile deletion removes the Windows profile data for the selected local account. Keep this disabled unless offboarding requires profile cleanup.</p>
+            <p class="notice error">Deleting a user removes the local Windows account from {{ activeServerProfile?.name || serverUrl }}. Profile deletion is intentionally separated and must be enabled only after profile API handling is production-ready.</p>
             <div class="grid">
               <label>
                 Type selected username to confirm
@@ -467,7 +654,7 @@ async function deleteUser() {
           <div class="card-heading">
             <div>
               <h2>Windows sessions</h2>
-              <p class="muted">Use logoff for stale or offboarding sessions before deleting or disabling an account.</p>
+              <p class="muted">Use logoff for stale or offboarding sessions on the active server before deleting or disabling an account.</p>
             </div>
             <span class="status-pill">{{ sessions.length }} sessions</span>
           </div>
@@ -497,7 +684,7 @@ async function deleteUser() {
           <div v-else class="empty-state">
             <div>
               <h3>No sessions loaded</h3>
-              <p>Load sessions from the central machine to manage active sign-ins.</p>
+              <p>Load sessions from the active server to manage active sign-ins.</p>
             </div>
           </div>
         </section>
