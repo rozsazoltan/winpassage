@@ -1,0 +1,43 @@
+name: Rust Quality
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup update stable
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Install rust-cache
+        uses: verzly/rust-cache@v0
+        with:
+          install-only: true
+
+      - name: Format
+        shell: bash
+        run: rust-cache run --config rust-cache.toml -- cargo fmt --all -- --check
+
+      - name: Clippy
+        shell: bash
+        run: rust-cache run --config rust-cache.toml -- cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        shell: bash
+        run: rust-cache run --config rust-cache.toml -- cargo test --workspace

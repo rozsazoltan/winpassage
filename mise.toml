@@ -1,0 +1,10 @@
+[tools]
+node = "22"
+pnpm = "10.32.1"
+rust = "stable"
+
+[tasks."check:rust"]
+run = "cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+
+[tasks."check:js"]
+run = "pnpm --recursive run build"

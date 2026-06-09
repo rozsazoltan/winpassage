@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Rust
+/target/
+**/target/
+Cargo.lock.bak
+
+# JavaScript
+node_modules/
+.pnpm-store/
+
+# generated
+.cache/
+dist/
+**/dist/
+**/src-tauri/target/
+**/src-tauri/gen/
+**/src-tauri/icons/*.icns
+
+# local env
+.env
+.env.*
+*.local
+
+# logs
+*.log
+*.jsonl

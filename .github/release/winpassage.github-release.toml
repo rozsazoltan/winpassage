@@ -1,0 +1,39 @@
+[release]
+target_branch = "master"
+branch_prefix = "release/"
+tag_prefix = "v"
+release_name_prefix = "WinPassage "
+release_name_suffix = ""
+commit_message = "chore(release): prepare {tag}"
+git_user_name = "github-actions[bot]"
+git_user_email = "41898282+github-actions[bot]@users.noreply.github.com"
+
+[[files]]
+path = "package.json"
+kind = "json"
+key = "version"
+
+[[files]]
+path = "apps/admin/package.json"
+kind = "json"
+key = "version"
+
+[[files]]
+path = "apps/client/package.json"
+kind = "json"
+key = "version"
+
+[[files]]
+path = "apps/admin/src-tauri/tauri.conf.json"
+kind = "json"
+key = "version"
+
+[[files]]
+path = "apps/client/src-tauri/tauri.conf.json"
+kind = "json"
+key = "version"
+
+[[files]]
+path = "Cargo.toml"
+kind = "toml"
+key = "workspace.package.version"
