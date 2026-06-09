@@ -79,4 +79,4 @@ license = "AGPL-3.0-only"
 publish = false
 repository = "https://github.com/rozsazoltan/winpassage"
 rust-version = "1.85"
-version = "0.2.0"
+version = "0.3.0"

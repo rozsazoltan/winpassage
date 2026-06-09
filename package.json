@@ -33,5 +33,5 @@
     "typecheck:js": "aube run typecheck --filter winpassage-admin && aube run typecheck --filter winpassage-client"
   },
   "type": "module",
-  "version": "0.2.0"
+  "version": "0.3.0"
 }
