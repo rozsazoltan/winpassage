@@ -192,12 +192,22 @@ Non-destructive Windows observability tests run with the normal Rust test suite.
 
 ## GitHub Actions
 
+Quality workflows are PR-first. They run on pull requests targeting `master` and can also be started manually with `workflow_dispatch`. They intentionally do not run on `push` to `master`, because the repository uses pull requests as the merge gate and there are no direct pushes to `master`.
+
+Keep this split:
+
+- `quality-rust.yml`: pull request + manual only; no post-merge `master` push trigger.
+- `quality-js.yml`: pull request + manual only; no post-merge `master` push trigger.
+- `release.yml`: manual release flow only.
+- `windows-destructive-validation.yml`: manual destructive validation only.
+
 Use the published Verzly action line:
 
 - `verzly/rust-cache@v0`
 - `verzly/cargo-release@v0`
 - `verzly/github-release@v0`
 - `verzly/tauri-release@v0`
+- `verzly/setup-aube@v1`
 
 Only update major action refs when the matching distribution repository has the new major tag.
 
