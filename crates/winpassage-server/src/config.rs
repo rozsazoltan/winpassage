@@ -17,6 +17,28 @@ impl ServerConfig {
         Self::from_values(|key| env::var(key).ok())
     }
 
+    pub fn from_env_with_overrides(
+        bind: Option<SocketAddr>,
+        admin_token: Option<String>,
+        require_tls: Option<bool>,
+    ) -> Result<Self> {
+        let mut config = Self::from_env()?;
+
+        if let Some(bind) = bind {
+            config.bind = bind;
+        }
+
+        if let Some(admin_token) = admin_token {
+            config.admin_token = Some(admin_token);
+        }
+
+        if let Some(require_tls) = require_tls {
+            config.require_tls = require_tls;
+        }
+
+        Ok(config)
+    }
+
     fn from_values(get: impl Fn(&str) -> Option<String>) -> Result<Self> {
         let bind_value = get("WINPASSAGE_BIND").unwrap_or_else(|| "127.0.0.1:4487".to_string());
         let bind = bind_value

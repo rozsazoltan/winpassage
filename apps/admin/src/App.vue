@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import { computed, onMounted, ref } from 'vue';
 import type {
   ActionResponse,
   ListSessionsResponse,
   ListUsersResponse,
   LocalSessionSummary,
   LocalUserSummary,
+  ServerInstallResult,
+  AdminHostStatus,
   ServerProfile,
 } from './types';
 
@@ -61,6 +64,17 @@ const loading = ref(false);
 const message = ref('');
 const error = ref('');
 
+const hostStatus = ref<AdminHostStatus | null>(null);
+const hostStatusLoading = ref(true);
+const installSourceDir = ref('');
+const installDir = ref('C:\\Program Files\\WinPassage');
+const installBindHost = ref('0.0.0.0');
+const installPort = ref(4487);
+const installAdminToken = ref('');
+const installRequireTls = ref(false);
+const demoteConfirmation = ref('');
+const demoteRemoveFiles = ref(true);
+
 const newServerName = ref('');
 const newServerNetwork = ref('');
 const newServerHost = ref('');
@@ -88,6 +102,32 @@ const canReset = computed(() => selectedUser.value.length > 0 && newPassword.val
 const canCreate = computed(() => createUsername.value.length > 0 && createPassword.value.length >= 12 && adminToken.value.length > 0);
 const canDelete = computed(() => selectedUser.value.length > 0 && deleteConfirmation.value === selectedUser.value && adminToken.value.length > 0);
 const canAddServer = computed(() => newServerName.value.trim().length > 0 && newServerHost.value.trim().length > 0 && Number(newServerPort.value) > 0);
+const isHostAdmin = computed(() => hostStatus.value?.is_windows === true && hostStatus.value?.is_elevated === true);
+const installServerUrl = computed(() => `http://${installBindHost.value}:${installPort.value}`);
+const canInstallServer = computed(
+  () =>
+    isHostAdmin.value &&
+    installBindHost.value.trim().length > 0 &&
+    Number(installPort.value) > 0 &&
+    Number(installPort.value) <= 65535 &&
+    installAdminToken.value.trim().length >= 16,
+);
+const canDemoteServer = computed(() => isHostAdmin.value && demoteConfirmation.value === 'DEMOTE SERVER');
+
+async function loadHostStatus() {
+  hostStatusLoading.value = true;
+  try {
+    hostStatus.value = await invoke<AdminHostStatus>('get_admin_host_status');
+    if (hostStatus.value.executable_dir && !installSourceDir.value) {
+      installSourceDir.value = hostStatus.value.executable_dir;
+    }
+    installDir.value = hostStatus.value.install_dir || installDir.value;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  } finally {
+    hostStatusLoading.value = false;
+  }
+}
 
 function persistProfiles() {
   localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(serverProfiles.value));
@@ -179,6 +219,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T;
+}
+
+async function runLocalTask(task: () => Promise<string>) {
+  loading.value = true;
+  error.value = '';
+  message.value = '';
+
+  try {
+    message.value = await task();
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught);
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function runTask(task: () => Promise<string>, refresh = true) {
@@ -308,6 +362,40 @@ async function logoffSession(sessionId: number) {
   });
 }
 
+async function installServerMode() {
+  await runLocalTask(async () => {
+    const result = await invoke<ServerInstallResult>('install_server_mode', {
+      request: {
+        source_dir: installSourceDir.value || null,
+        install_dir: installDir.value || null,
+        bind_host: installBindHost.value,
+        port: Number(installPort.value),
+        admin_token: installAdminToken.value,
+        require_tls: installRequireTls.value,
+      },
+    });
+
+    serverUrl.value = result.server_url || installServerUrl.value;
+    adminToken.value = installAdminToken.value;
+    return `${result.message} Use ${serverUrl.value} from clients and admin profiles.`;
+  });
+}
+
+async function demoteServerMode() {
+  await runLocalTask(async () => {
+    const result = await invoke<ServerInstallResult>('demote_server_mode', {
+      request: {
+        install_dir: installDir.value || null,
+        confirmation: demoteConfirmation.value,
+        remove_files: demoteRemoveFiles.value,
+      },
+    });
+
+    demoteConfirmation.value = '';
+    return result.message;
+  });
+}
+
 async function deleteUser() {
   await runTask(async () => {
     const payload = await request<ActionResponse>(`/v1/users/${encodeURIComponent(selectedUser.value)}`, {
@@ -326,11 +414,39 @@ async function deleteUser() {
     return `${payload.message}. Request ${payload.request_id}`;
   });
 }
+
+onMounted(loadHostStatus);
 </script>
 
 <template>
   <main class="app app-admin">
-    <section class="app-shell">
+    <section v-if="hostStatusLoading" class="lock-screen">
+      <article class="lock-card">
+        <div class="lock-icon">…</div>
+        <p class="eyebrow">Checking privileges</p>
+        <h1>Preparing the admin console.</h1>
+        <p class="lead">WinPassage is checking whether this Windows account can manage the local server installation.</p>
+      </article>
+    </section>
+
+    <section v-else-if="!isHostAdmin" class="lock-screen">
+      <article class="lock-card">
+        <div class="lock-icon">🔒</div>
+        <p class="eyebrow">Administrator account required</p>
+        <h1>This console is locked.</h1>
+        <p class="lead">{{ hostStatus?.message }}</p>
+        <ol class="step-list">
+          <li class="step-item"><span class="step-number">1</span><span>Sign out from the standard Windows account.</span></li>
+          <li class="step-item"><span class="step-number">2</span><span>Sign in with a local administrator account on this computer.</span></li>
+          <li class="step-item"><span class="step-number">3</span><span>Open WinPassage Admin again to install or manage the server service.</span></li>
+        </ol>
+        <div class="actions">
+          <button class="secondary" @click="loadHostStatus">Check again</button>
+        </div>
+      </article>
+    </section>
+
+    <section v-else class="app-shell">
       <aside class="side-rail" aria-label="WinPassage Admin navigation">
         <div class="brand-block">
           <div class="brand-mark">WP</div>
@@ -343,6 +459,7 @@ async function deleteUser() {
         <nav class="rail-menu" aria-label="Workspace sections">
           <span class="rail-item active"><span class="rail-dot"></span>Overview</span>
           <span class="rail-item">Networks</span>
+          <span class="rail-item">Server install</span>
           <span class="rail-item">Users</span>
           <span class="rail-item">Access</span>
           <span class="rail-item">Sessions</span>
@@ -394,6 +511,73 @@ async function deleteUser() {
             <p class="metric-value">{{ activeSessions }}</p>
             <p class="metric-hint">Named Windows sessions</p>
           </article>
+        </section>
+
+        <section class="surface-card server-install-card">
+          <div class="card-heading">
+            <div>
+              <h2>Make this computer a WinPassage server</h2>
+              <p class="muted">Install the background service on this Windows Pro machine. Clients and admins connect later with an <strong>IP:port</strong> address.</p>
+            </div>
+            <span class="status-pill success">Administrator verified</span>
+          </div>
+
+          <p class="notice warning">Place <strong>winpassage-server.exe</strong>, <strong>winpassage-agentctl.exe</strong>, and <strong>winpassage-updater.exe</strong> next to WinPassage Admin or choose their source folder before installing.</p>
+
+          <div class="grid three">
+            <label>
+              Binary source folder
+              <input v-model="installSourceDir" placeholder="Folder containing the service executables" />
+            </label>
+            <label>
+              Install folder
+              <input v-model="installDir" placeholder="C:\Program Files\WinPassage" />
+            </label>
+            <label>
+              Admin token for this server
+              <input v-model="installAdminToken" type="password" autocomplete="new-password" placeholder="At least 16 characters" />
+            </label>
+            <label>
+              Bind host
+              <input v-model="installBindHost" placeholder="0.0.0.0" />
+            </label>
+            <label>
+              Port
+              <input v-model.number="installPort" type="number" min="1" max="65535" />
+            </label>
+            <label class="toggle-row install-toggle"><input v-model="installRequireTls" type="checkbox" /> Require TLS at the service boundary</label>
+          </div>
+
+          <div class="selected-card">
+            <p class="metric-label">Client/admin connection address</p>
+            <strong>{{ installServerUrl }}</strong>
+            <span class="muted">Use the server computer's LAN IP address instead of 0.0.0.0 when adding client or admin profiles.</span>
+          </div>
+
+          <div class="actions">
+            <button :disabled="loading || !canInstallServer" @click="installServerMode">Install server service</button>
+            <button class="secondary" :disabled="loading" @click="loadHostStatus">Recheck admin rights</button>
+          </div>
+        </section>
+
+        <section class="danger-card">
+          <div class="card-heading">
+            <div>
+              <h2>Demote this computer back to client-only mode</h2>
+              <p class="muted">Stops and removes the local WinPassage service. This does not delete Windows users or profiles.</p>
+            </div>
+            <span class="status-pill danger">Destructive</span>
+          </div>
+          <div class="grid two">
+            <label>
+              Type DEMOTE SERVER to confirm
+              <input v-model="demoteConfirmation" placeholder="DEMOTE SERVER" />
+            </label>
+            <label class="toggle-row install-toggle"><input v-model="demoteRemoveFiles" type="checkbox" /> Remove installed WinPassage service executables</label>
+          </div>
+          <div class="actions">
+            <button class="danger" :disabled="loading || !canDemoteServer" @click="demoteServerMode">Remove server service</button>
+          </div>
         </section>
 
         <section class="surface-card">

@@ -41,3 +41,18 @@ export interface ActionResponse {
 }
 
 export type PasswordChangeResponse = ActionResponse;
+
+export interface AdminHostStatus {
+  is_windows: boolean;
+  is_elevated: boolean;
+  install_dir: string;
+  executable_dir: string | null;
+  message: string;
+}
+
+export interface ServerInstallResult {
+  success: boolean;
+  message: string;
+  install_dir: string;
+  server_url: string;
+}

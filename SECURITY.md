@@ -56,3 +56,11 @@ The client app should display the configured server address but keep editing beh
 WinPassage updates must be sourced only from `https://github.com/rozsazoltan/winpassage` release assets and the matching GitHub releases API. The updater must reject custom mirrors, custom repositories, non-HTTPS URLs, and release asset URLs outside the official repository.
 
 Privileged server updates should be applied through the dedicated updater/service-control boundary, not directly by the user-facing Tauri apps.
+
+## Local server installation safety
+
+WinPassage Admin must require a Windows administrator account for local service installation, service removal, and server demotion. Opening the admin app from a standard account should show a locked state with instructions to switch to an administrator account.
+
+WinPassage Client must not contain server installation or service-management features.
+
+Changing the service port changes how clients and admins connect to the server. Operators must distribute the correct `IP:port` value to client profiles after changing the port.

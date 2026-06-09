@@ -426,3 +426,13 @@ Use the Verzly release tools the same way the working release templates do: inst
 - If release tooling changes, keep the workflow aligned with the Nutrino/toolchain pattern and the actual CLI contracts.
 - For `cargo-release`, use `build --config <file>`; do not add unsupported `--output`, `--windows-x64`, `--target`, `--version`, or `--verbose` flags unless the checked-in CLI contract explicitly documents them.
 - For `tauri-release`, use `build --config <file>` and put output paths/platform selection in the TOML config; do not add unsupported `--output`, `--windows`, or `--verbose` flags.
+
+## Admin-only server installation rules
+
+AI agents must keep server installation and demotion features out of `apps/client`. The client app is only for end-user password changes and mapped-drive credential refresh.
+
+Server installation UI belongs in `apps/admin` and must be gated behind local Windows administrator privileges. If the admin app runs under a standard Windows account, show a lock state and instructions to switch to an administrator account instead of rendering privileged controls.
+
+The admin app may install `winpassage-server.exe`, `winpassage-agentctl.exe`, and `winpassage-updater.exe` into `C:\Program Files\WinPassage`, configure a custom port, and call `winpassage-agentctl` to install/start/stop/delete the Windows Service.
+
+Server demotion must remove only the WinPassage service and optionally copied WinPassage executables. Do not delete Windows accounts, Windows profiles, shared folders, mapped drives, or audit logs during demotion.

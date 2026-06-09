@@ -115,46 +115,57 @@ Download the latest Windows release assets from:
 https://github.com/rozsazoltan/winpassage/releases/latest
 ```
 
-On the central Windows Pro machine, create the install directory and copy the service tools into it:
+On the central Windows Pro machine, place these files in the same folder:
 
-```powershell
-New-Item -ItemType Directory -Force "C:\Program Files\WinPassage"
-
-Copy-Item .\winpassage-server.exe "C:\Program Files\WinPassage\"
-Copy-Item .\winpassage-agentctl.exe "C:\Program Files\WinPassage\"
-Copy-Item .\winpassage-updater.exe "C:\Program Files\WinPassage\"
+```text
+WinPassage Admin.exe
+winpassage-server.exe
+winpassage-agentctl.exe
+winpassage-updater.exe
 ```
 
-Install and start the Windows Service from an elevated PowerShell:
+Sign in with a local administrator account, open **WinPassage Admin**, and use **Make this computer a WinPassage server**:
 
-```powershell
-& "C:\Program Files\WinPassage\winpassage-agentctl.exe" install `
-  --server-bin "C:\Program Files\WinPassage\winpassage-server.exe"
-
-& "C:\Program Files\WinPassage\winpassage-agentctl.exe" start
+```text
+Binary source folder: folder containing the three service executables
+Install folder:       C:\Program Files\WinPassage
+Bind host:            0.0.0.0
+Port:                 4487 or your chosen private-network port
+Admin token:          long random token, at least 16 characters
 ```
 
-Check that the agent is alive:
+The service installs the server tools into the install folder and starts the Windows Service. Clients and admin profiles connect with:
 
-```powershell
-Invoke-RestMethod http://CENTRAL-PC:4487/health
+```text
+http://SERVER-IP:PORT
+```
+
+Example:
+
+```text
+http://192.168.1.10:4487
 ```
 
 Install the desktop apps where needed:
 
 ```text
-WinPassage Admin  -> administrator workstation
+WinPassage Admin  -> central machine or administrator workstation
 WinPassage Client -> user workstations
 ```
 
 Open **WinPassage Admin**, add the central machine by IP/DNS address, load users, and test with a disposable local Windows account first.
+
+> [!TIP]
+> If you open WinPassage Admin from a standard Windows account, the app shows a lock screen. Sign in with a local administrator account or run the app as administrator before installing or managing the local service.
 
 > [!IMPORTANT]
 > Do not expose the WinPassage port to the public internet. Keep it on a trusted LAN/VPN and use a long random admin token.
 
 ### Server machine
 
-The central machine is the Windows 11 Pro computer that owns the local user accounts and shared folders.
+The central machine is the Windows 11 Pro computer that owns the local user accounts and shared folders. A machine becomes a WinPassage server only after the server service is installed from **WinPassage Admin** with administrator privileges.
+
+Use **Demote this computer back to client-only mode** in WinPassage Admin to stop and remove the local WinPassage service. Demotion removes the WinPassage service and optionally the copied WinPassage executables, but it never deletes Windows users or profiles.
 
 Before users start using WinPassage, the operator should confirm:
 
@@ -205,6 +216,8 @@ The profile does not store Windows users and should not store admin passwords. U
 ### Admin app
 
 Install `WinPassage Admin` on the central machine or an administrator workstation.
+
+On the central machine, the app requires a Windows administrator account for local server installation, demotion, and service management. Standard users see a locked screen with instructions to switch to an administrator account.
 
 Open the app and register one or more server profiles:
 

@@ -8,7 +8,7 @@ mod service;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{Cli, Command};
+use cli::{Cli, Command, ServerOptions};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,17 +22,27 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Serve => http::serve_until_shutdown(config::ServerConfig::from_env()?).await,
-        Command::Service => run_as_service(),
+        Command::Serve(options) => {
+            http::serve_until_shutdown(config_from_options(options)?).await
+        }
+        Command::Service(options) => run_as_service(options),
     }
 }
 
+fn config_from_options(options: ServerOptions) -> Result<config::ServerConfig> {
+    config::ServerConfig::from_env_with_overrides(
+        options.bind,
+        options.admin_token,
+        options.require_tls,
+    )
+}
+
 #[cfg(windows)]
-fn run_as_service() -> Result<()> {
-    service::run_service_dispatcher()
+fn run_as_service(options: ServerOptions) -> Result<()> {
+    service::run_service_dispatcher(options)
 }
 
 #[cfg(not(windows))]
-fn run_as_service() -> Result<()> {
+fn run_as_service(_options: ServerOptions) -> Result<()> {
     anyhow::bail!("Windows Service mode is available only on Windows")
 }

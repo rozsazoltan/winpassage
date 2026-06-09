@@ -82,20 +82,19 @@ aube run dev:client
 Build release binaries on Windows:
 
 ```powershell
-cargo build --release -p winpassage-server -p winpassage-agentctl
+cargo build --release -p winpassage-server -p winpassage-agentctl -p winpassage-updater
 ```
 
-Copy them to:
+The preferred operator flow is to place the three service executables next to WinPassage Admin and use the admin app's **Make this computer a WinPassage server** button.
 
-```text
-C:\Program Files\WinPassage\
-```
-
-Install the service:
+Manual service install remains available for validation:
 
 ```powershell
 & "C:\Program Files\WinPassage\winpassage-agentctl.exe" install `
-  --server-bin "C:\Program Files\WinPassage\winpassage-server.exe"
+  --server-bin "C:\Program Files\WinPassage\winpassage-server.exe" `
+  --bind "0.0.0.0:4487" `
+  --admin-token "replace-with-a-long-random-token" `
+  --require-tls false
 ```
 
 Start, stop, and remove it:
@@ -106,116 +105,15 @@ Start, stop, and remove it:
 & "C:\Program Files\WinPassage\winpassage-agentctl.exe" uninstall
 ```
 
-
 ## Local network configuration
 
-Set the machine-level environment variables before starting the service:
+The admin install flow writes the selected bind address and admin token into the service command line. Environment variables are still supported for foreground development runs:
 
 ```powershell
-setx WINPASSAGE_BIND "0.0.0.0:4487" /M
-setx WINPASSAGE_ADMIN_TOKEN "replace-with-a-long-random-token" /M
-setx WINPASSAGE_REQUIRE_TLS "false" /M
-setx WINPASSAGE_AUDIT_LOG "C:\ProgramData\WinPassage\audit.jsonl" /M
-```
-
-`WINPASSAGE_REQUIRE_TLS=false` is acceptable only for isolated private LAN, VPN, or first setup testing. Production deployments should use TLS/mTLS in front of the agent or keep the agent bound to loopback behind a trusted local proxy.
-
-Allow the private-network port:
-
-```powershell
-New-NetFirewallRule `
-  -DisplayName "WinPassage Agent" `
-  -Direction Inbound `
-  -Action Allow `
-  -Protocol TCP `
-  -LocalPort 4487 `
-  -Profile Private
-```
-
-Check the agent after start:
-
-```powershell
-Invoke-RestMethod http://localhost:4487/health
-```
-
-## Multi-server admin profiles
-
-Use the admin app's server registry when one operator manages multiple independent Windows Pro central machines. Add one profile per machine:
-
-```text
-Name: Office server
-Network: Budapest office
-IP/DNS: 192.168.1.10
-Port: 4487
-Protocol: http or https
-```
-
-Development expectations:
-
-- selecting a profile must update the active server URL;
-- switching profiles should clear loaded users and sessions;
-- profiles must not store Windows users, passwords, or long-lived admin tokens;
-- the selected profile must be visible before privileged operations;
-- client server settings must stay behind an advanced confirmation flow.
-
-## Testing
-
-Run the strict local quality gate before opening or updating a pull request:
-
-```bash
-aube run check:rust
-aube run check:js
-```
-
-The Rust gate is intentionally broad:
-
-```text
-cargo fmt --all -- --check
-cargo check --workspace --all-targets
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --all-targets
-cargo test --workspace --doc
-cargo doc --workspace --no-deps with RUSTDOCFLAGS=-D warnings in CI
-```
-
-The frontend gate is also split into separate failures so CI shows the real cause:
-
-```text
-vue-tsc --noEmit for admin and client
-vitest run for admin and client
-vite build for admin and client
-```
-
-Windows-specific code must be validated on Windows 11 Pro because local user, service control, session, and mapped drive APIs cannot be fully proven on Linux CI.
-
-Non-destructive Windows observability tests run with the normal Rust test suite. Destructive account lifecycle tests are ignored by default and are available through the `Windows Destructive Validation` GitHub Actions workflow. That workflow creates, modifies, grants/revokes administrator membership for, and deletes a disposable local test account on the runner. Run it only on disposable CI runners or test machines.
-
-## GitHub Actions
-
-Quality workflows are PR-first. They run on pull requests targeting `master` and can also be started manually with `workflow_dispatch`. They intentionally do not run on `push` to `master`, because the repository uses pull requests as the merge gate and there are no direct pushes to `master`.
-
-Keep this split:
-
-- `quality-rust.yml`: pull request + manual only; no post-merge `master` push trigger.
-- `quality-js.yml`: pull request + manual only; no post-merge `master` push trigger.
-- `release.yml`: manual release flow only.
-- `windows-destructive-validation.yml`: manual destructive validation only.
-
-Use the published Verzly action line:
-
-- `verzly/rust-cache@latest`
-- `verzly/cargo-release@latest`
-- `verzly/github-release@latest`
-- `verzly/tauri-release@latest`
-- `verzly/setup-aube@v1`
-
-Only update major action refs when the matching distribution repository has the new major tag.
-
-Release jobs that create commits, tags, or merge release branches must configure the local Git author before running `github-release prepare` or `github-release finalize`:
-
-```bash
-git config user.name "github-actions[bot]"
-git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+$env:WINPASSAGE_BIND = "0.0.0.0:4487"
+$env:WINPASSAGE_ADMIN_TOKEN = "replace-with-a-long-random-token"
+$env:WINPASSAGE_REQUIRE_TLS = "false"
+$env:WINPASSAGE_AUDIT_LOG = "C:\ProgramData\WinPassage\audit.jsonl"
 ```
 
 ## Release workflow
@@ -311,3 +209,28 @@ The release workflow uses `verzly/github-release@latest` for `prepare`, `finaliz
 ## Updater source policy
 
 `winpassage-updater` is the dedicated update entrypoint. It must only resolve metadata and release assets from `https://github.com/rozsazoltan/winpassage` and the matching GitHub releases API. Do not add custom update hosts, mirrors, or user-configurable repositories.
+
+## Server installation from WinPassage Admin
+
+WinPassage Client must stay client-only. Do not add service installation, server demotion, or local machine management features to the client app.
+
+The server installation flow belongs to WinPassage Admin only:
+
+```text
+WinPassage Admin -> copy service binaries -> install Windows Service -> start service
+```
+
+The admin app requires an elevated Windows administrator account before showing the normal console. If it is opened from a standard account, it must show the lock screen and instructions to switch to an administrator account.
+
+The install form should collect:
+
+```text
+- source folder containing winpassage-server.exe, winpassage-agentctl.exe, winpassage-updater.exe
+- install folder, normally C:\Program Files\WinPassage
+- bind host, normally 0.0.0.0 for private LAN use
+- port, for example 4487
+- long admin token
+- TLS boundary setting
+```
+
+The demotion flow removes only the WinPassage service and optionally the copied WinPassage executables. It must not delete Windows users, Windows profiles, shares, mapped drives, or audit logs.
