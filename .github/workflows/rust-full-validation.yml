@@ -1,8 +1,6 @@
-name: Rust Quality
+name: Rust Full Validation
 
 on:
-  pull_request:
-    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -10,10 +8,11 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  RUSTDOCFLAGS: "-D warnings"
 
 jobs:
-  rust:
-    name: Rust PR quality
+  rust-full:
+    name: Rust full validation
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -35,10 +34,10 @@ jobs:
             .cache/rust
             ~/.cargo/registry
             ~/.cargo/git
-          key: rust-quality-v3-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          key: rust-full-v1-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
           restore-keys: |
+            rust-full-v1-${{ runner.os }}-
             rust-quality-v3-${{ runner.os }}-
-            rust-quality-${{ runner.os }}-
             rust-${{ runner.os }}-
 
       - name: Install rust-cache
@@ -46,12 +45,15 @@ jobs:
         with:
           install-only: true
 
-      - name: Rust format, Clippy and tests
+      - name: Rust full validation
         shell: pwsh
         run: |
           rust-cache run --config rust-cache.toml -- pwsh -NoLogo -NoProfile -NonInteractive -Command "& {
             `$ErrorActionPreference = 'Stop'
             cargo fmt --all -- --check
+            cargo check --workspace --all-targets
             cargo clippy --workspace --all-targets -- -D warnings
-            cargo test --workspace --lib --bins
+            cargo test --workspace --all-targets
+            cargo test --workspace --doc
+            cargo doc --workspace --no-deps
           }"

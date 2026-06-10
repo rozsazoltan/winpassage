@@ -12,7 +12,10 @@
     "tauri:build": "tauri build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "oxfmt --write \"src/**/*.ts\"",
+    "format:check": "oxfmt --check \"src/**/*.ts\"",
+    "lint": "oxlint --deny-warnings \"src/**/*.ts\""
   },
   "dependencies": {
     "@tauri-apps/api": "catalog:",
@@ -26,7 +29,9 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vue-tsc": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "oxlint": "catalog:",
+    "oxfmt": "catalog:"
   },
   "license": "AGPL-3.0-only"
 }
