@@ -49,9 +49,19 @@ jobs:
       - name: Rust format, Clippy and tests
         shell: pwsh
         run: |
-          rust-cache run --config rust-cache.toml -- pwsh -NoLogo -NoProfile -NonInteractive -Command "& {
-            `$ErrorActionPreference = 'Stop'
-            cargo fmt --all -- --check
-            cargo clippy --workspace --all-targets -- -D warnings
-            cargo test --workspace --lib --bins
-          }"
+          rust-cache run --config rust-cache.toml -- pwsh -NoLogo -NoProfile -NonInteractive -Command @'
+          $ErrorActionPreference = "Stop"
+
+          function Invoke-CargoStep {
+            param([Parameter(Mandatory = $true)][string[]] $CargoArgs)
+
+            & cargo @CargoArgs
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+          Invoke-CargoStep @("fmt", "--all", "--", "--check")
+          Invoke-CargoStep @("clippy", "--workspace", "--all-targets", "--", "-D", "warnings")
+          Invoke-CargoStep @("test", "--workspace", "--lib", "--bins")
+          '@

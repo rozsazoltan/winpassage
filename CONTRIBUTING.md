@@ -317,3 +317,10 @@ WinPassageAdmin installs the local server components by downloading the official
 
 The user interface must stay concise for auditors and security operators: keep install and update actions as buttons, move detailed inputs into modals, avoid crowded dashboards, and keep About clear about what WinPassage is and is not.
 
+
+
+### CI guardrails
+
+Rust Quality must fail immediately after any failed cargo phase. Do not chain native cargo commands in PowerShell without checking `$LASTEXITCODE`, because a later successful command can otherwise hide an earlier `cargo fmt` failure.
+
+JavaScript formatting uses the root `oxfmt` binary from root devDependencies. Keep `oxfmt` and `oxlint` available at the workspace root when root-level scripts call them directly.

@@ -21,14 +21,16 @@
     "test:js": "aube run test --filter winpassage-admin && aube run test --filter winpassage-client",
     "build:js": "aube run build --filter winpassage-admin && aube run build --filter winpassage-client",
     "check:all": "aube run check:rust && aube run check:js",
-    "fmt:js": "oxfmt --write \"apps/*/src/**/*.ts\"",
-    "fmt:js:check": "oxfmt --check \"apps/*/src/**/*.ts\"",
-    "lint:js": "oxlint --deny-warnings \"apps/*/src/**/*.ts\"",
+    "fmt:js": "oxfmt apps/admin/src apps/client/src",
+    "fmt:js:check": "oxfmt --check apps/admin/src apps/client/src",
+    "lint:js": "oxlint --deny-warnings apps/admin/src apps/client/src",
     "doc:rust": "cargo test --workspace --doc && cargo doc --workspace --no-deps",
     "check:rust:full": "cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && cargo test --workspace --doc && cargo doc --workspace --no-deps"
   },
   "devDependencies": {
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:"
   },
   "license": "AGPL-3.0-only",
   "repository": {

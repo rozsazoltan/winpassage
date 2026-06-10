@@ -256,8 +256,10 @@ fn resolve_install_dir(value: Option<&str>) -> PathBuf {
 
 fn ensure_elevated() -> Result<(), String> {
     if cfg!(windows) && !is_process_elevated() {
-        return Err("Run WinPassageAdmin as administrator to install or remove the local server."
-            .to_string());
+        return Err(
+            "Run WinPassageAdmin as administrator to install or remove the local server."
+                .to_string(),
+        );
     }
 
     Ok(())
@@ -306,8 +308,9 @@ fn download_service_binaries(install_dir: &Path) -> Result<(), String> {
         let asset = find_asset(&release, &asset_name)?;
         let checksum_asset = find_asset(&release, &format!("{asset_name}.sha256"))?;
         let bytes = download_asset(&asset.browser_download_url)?;
-        let checksum_text = String::from_utf8(download_asset(&checksum_asset.browser_download_url)?)
-            .map_err(|error| format!("invalid checksum file for {asset_name}: {error}"))?;
+        let checksum_text =
+            String::from_utf8(download_asset(&checksum_asset.browser_download_url)?)
+                .map_err(|error| format!("invalid checksum file for {asset_name}: {error}"))?;
         verify_sha256(&bytes, &checksum_text, &asset_name)?;
 
         let target_name = format!("winpassage-{component}.exe");
@@ -421,7 +424,11 @@ fn assert_allowed_update_url(raw: &str) -> Result<(), String> {
                 ));
             }
         }
-        _ => return Err(format!("updates are allowed only from github.com/{OWNER}/{REPO}")),
+        _ => {
+            return Err(format!(
+                "updates are allowed only from github.com/{OWNER}/{REPO}"
+            ))
+        }
     }
 
     Ok(())

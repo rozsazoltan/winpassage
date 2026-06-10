@@ -113,7 +113,10 @@ fn fetch_latest_release() -> Result<GithubRelease> {
 fn start_local_service(install_dir: PathBuf) -> Result<()> {
     let agentctl = install_dir.join("winpassage-agentctl.exe");
     if !agentctl.exists() {
-        bail!("winpassage-agentctl.exe was not found in {}", install_dir.display());
+        bail!(
+            "winpassage-agentctl.exe was not found in {}",
+            install_dir.display()
+        );
     }
 
     let output = ProcessCommand::new(&agentctl).arg("start").output()?;
