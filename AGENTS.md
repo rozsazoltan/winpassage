@@ -34,6 +34,7 @@ winpassage/
     winpassage-windows/             Windows API wrappers for local users, mapped drives, credentials.
     winpassage-server/              HTTP API and Windows Service entrypoint.
     winpassage-agentctl/            Service install/start/stop helper CLI.
+    winpassage-updater/             Official GitHub-only updater/check/bootstrap CLI.
 
   apps/
     admin/                          Tauri 2 admin desktop app.
@@ -43,6 +44,19 @@ winpassage/
     workflows/                      CI and release workflows.
     release/                        Verzly release configuration files.
 ```
+
+
+## Quality toolchain rules
+
+Use one quality stack per language:
+
+```text
+PHP:        Rector (`rectorphp/rector`) and Pest (`pestphp/pest`) if PHP packages are added.
+JavaScript: Oxlint, Oxfmt, Vitest, Vue type checking, and Vite production builds.
+Rust:       rustfmt, Clippy with `-D warnings`, Cargo unit tests, and manual full validation for heavy checks.
+```
+
+Do not add ESLint, Prettier, PHPUnit, PHP-CS-Fixer, or a second Rust lint framework unless the repository owner explicitly asks for that migration. JavaScript formatting/linting should target TypeScript source files; Vue SFC type safety remains covered by `vue-tsc`.
 
 ## Architecture rules
 
@@ -206,6 +220,18 @@ Implementation notes:
 - Do not use random decorative icons that obscure meaning. Labels must stand on their own.
 - Keep form validation visible near the relevant action.
 
+
+## Branding and icon rules
+
+The bridge-lock icon is the approved WinPassage mark. The app icon assets and in-app brand mark must use the same source image so the icon in Windows, the title bar, sidebar, onboarding, and empty states look consistent.
+
+If the icon changes:
+
+1. regenerate both Admin and Client Tauri icon sets;
+2. update `apps/admin/src/brand.ts` and `apps/client/src/brand.ts`;
+3. keep the in-app mark visually identical to the app icon;
+4. do not reintroduce `WP` lettermarks or generic lock icons.
+
 ## Documentation rules
 
 Follow the existing documentation split.
@@ -304,17 +330,23 @@ aube run check:rust
 aube run check:js
 ```
 
-Rust changes should stay covered by all of these checks:
+Rust PR changes should stay covered by:
 
 - formatting with `cargo fmt --all -- --check`;
-- compilation with `cargo check --workspace --all-targets`;
 - lints with `cargo clippy --workspace --all-targets -- -D warnings`;
-- unit and non-destructive integration tests with `cargo test --workspace --all-targets`;
+- fast unit/binary tests with `cargo test --workspace --lib --bins`.
+
+Use the manual **Rust Full Validation** workflow for heavier release/security checks:
+
+- compilation with `cargo check --workspace --all-targets`;
+- all-target tests with `cargo test --workspace --all-targets`;
 - documentation tests with `cargo test --workspace --doc`;
 - rustdoc warning checks with `RUSTDOCFLAGS=-D warnings cargo doc --workspace --no-deps`.
 
 Frontend changes should stay covered by:
 
+- Oxfmt check for TypeScript sources;
+- Oxlint with `--deny-warnings` for TypeScript sources;
 - `vue-tsc --noEmit` for admin and client;
 - `vitest run` for admin and client;
 - production `vite build` for admin and client.
@@ -440,7 +472,9 @@ Server demotion must remove only the WinPassage service and optionally copied Wi
 
 ### Rust Quality cache rule
 
-Keep the PR Rust Quality workflow cache-friendly and Windows-native. The workflow should install `verzly/rust-cache` once and run the strict Rust sequence inside one `rust-cache run --config rust-cache.toml -- pwsh ...` invocation. Do not use `bash -lc` inside `rust-cache run` on `windows-latest`, because it can resolve to WSL and fail when no WSL distribution is installed. Do not reintroduce separate `rust-cache run` steps for format, check, clippy, tests, doctests, and docs unless there is a clear measured reason. The `.cache` target directory must stay shared across those commands in the same job.
+Keep the PR Rust Quality workflow fast, cache-friendly, and Windows-native. The PR workflow should run `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace --lib --bins` inside one `rust-cache run --config rust-cache.toml -- pwsh ...` invocation. Do not use `bash -lc` inside `rust-cache run` on `windows-latest`, because it can resolve to WSL and fail when no WSL distribution is installed.
+
+Keep doctests, rustdoc, `cargo check --all-targets`, and all-target tests in the manual Rust Full Validation workflow unless there is a specific reason to make PRs slower again.
 
 ## CI cache guidance for AI agents
 
@@ -509,3 +543,10 @@ WinPassageAdmin installs the local server components by downloading the official
 
 The user interface must stay concise for auditors and security operators: keep install and update actions as buttons, move detailed inputs into modals, avoid crowded dashboards, and keep About clear about what WinPassage is and is not.
 
+
+
+### CI guardrails
+
+Rust Quality must fail immediately after any failed cargo phase. Do not chain native cargo commands in PowerShell without checking `$LASTEXITCODE`, because a later successful command can otherwise hide an earlier `cargo fmt` failure.
+
+JavaScript formatting uses the root `oxfmt` binary from root devDependencies. Keep `oxfmt` and `oxlint` available at the workspace root when root-level scripts call them directly.

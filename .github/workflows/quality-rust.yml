@@ -13,7 +13,7 @@ env:
 
 jobs:
   rust:
-    name: Rust strict quality
+    name: Rust PR quality
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -23,8 +23,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          rustup update stable
           rustup default stable
+          rustup component add rustfmt clippy
           rustc --version
           cargo --version
 
@@ -35,8 +35,9 @@ jobs:
             .cache/rust
             ~/.cargo/registry
             ~/.cargo/git
-          key: rust-quality-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
+          key: rust-quality-v3-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-cache.toml') }}
           restore-keys: |
+            rust-quality-v3-${{ runner.os }}-
             rust-quality-${{ runner.os }}-
             rust-${{ runner.os }}-
 
@@ -45,9 +46,22 @@ jobs:
         with:
           install-only: true
 
-      - name: Rust strict quality
+      - name: Rust format, Clippy and tests
         shell: pwsh
-        env:
-          RUSTDOCFLAGS: "-D warnings"
         run: |
-          rust-cache run --config rust-cache.toml -- pwsh -NoLogo -NoProfile -NonInteractive -Command "& { `$ErrorActionPreference = 'Stop'; cargo fmt --all -- --check; cargo check --workspace --all-targets; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets; cargo test --workspace --doc; cargo doc --workspace --no-deps }"
+          rust-cache run --config rust-cache.toml -- pwsh -NoLogo -NoProfile -NonInteractive -Command @'
+          $ErrorActionPreference = "Stop"
+
+          function Invoke-CargoStep {
+            param([Parameter(Mandatory = $true)][string[]] $CargoArgs)
+
+            & cargo @CargoArgs
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+          Invoke-CargoStep @("fmt", "--all", "--", "--check")
+          Invoke-CargoStep @("clippy", "--workspace", "--all-targets", "--", "-D", "warnings")
+          Invoke-CargoStep @("test", "--workspace", "--lib", "--bins")
+          '@

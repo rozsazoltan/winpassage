@@ -57,6 +57,14 @@ jobs:
         with:
           run_install: true
 
+      - name: Format JavaScript and TypeScript
+        shell: bash
+        run: aube run fmt:js:check
+
+      - name: Lint JavaScript and TypeScript
+        shell: bash
+        run: aube run lint:js
+
       - name: Typecheck frontends
         shell: bash
         run: aube run typecheck:js

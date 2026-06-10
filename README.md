@@ -480,6 +480,18 @@ WinPassage helps with audit-friendly password change workflows, but NIS2, ISO 27
 See: `CONTRIBUTING.md`.
 
 
+### Quality stack
+
+WinPassage keeps the toolchain intentionally small:
+
+```text
+JavaScript: Oxlint, Oxfmt, Vitest, Vue type checking, Vite
+Rust:       rustfmt, Clippy, Cargo tests
+PHP:        Rector and Pest if PHP packages are added later
+```
+
+The regular PR Rust workflow is optimized for feedback speed. Full Rust validation remains available as a manual workflow for release and security-sensitive changes.
+
 ## License & Acknowledgments
 
 WinPassage is released under the GNU Affero General Public License v3.0 only.

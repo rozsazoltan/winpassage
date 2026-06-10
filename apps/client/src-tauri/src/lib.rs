@@ -40,12 +40,8 @@ fn reconnect_mapped_drives(
 
 #[tauri::command]
 fn mount_mapped_drive(request: MountMappedDriveRequest) -> Result<DriveOperationResponse, String> {
-    winpassage_windows::mount_mapped_drive(
-        &request.username,
-        &request.password,
-        &request.drive,
-    )
-    .map_err(|error| error.to_string())
+    winpassage_windows::mount_mapped_drive(&request.username, &request.password, &request.drive)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -93,7 +89,9 @@ fn assert_allowed_api_url(raw: &str) -> Result<(), String> {
         return Err("update URL must use https".to_string());
     }
     if url.host_str() != Some(GITHUB_API_HOST) {
-        return Err(format!("updates are allowed only from github.com/{OWNER}/{REPO}"));
+        return Err(format!(
+            "updates are allowed only from github.com/{OWNER}/{REPO}"
+        ));
     }
     let prefix = format!("/repos/{OWNER}/{REPO}/releases/");
     if !url.path().starts_with(&prefix) {

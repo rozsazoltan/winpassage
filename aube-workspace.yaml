@@ -12,5 +12,7 @@ catalog:
   driver.js: ^1.4.0
   vue-tsc: ^3.0.0
   vitest: ^3.2.0
+  oxlint: latest
+  oxfmt: latest
 
 verifyDepsBeforeRun: install
