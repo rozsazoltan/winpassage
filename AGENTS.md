@@ -500,3 +500,12 @@ WinPassage UI uses a restrained professional desktop design system. Keep surface
 Use the local Nutrino-style icon pack in `apps/*/src/icons.ts` through `lucideSvg(...)`. Do not add a runtime icon dependency unless there is a strong reason. Use `apps/*/src/brand.ts` for the bridge-lock SVG mark inside the app. Do not reintroduce `WP` lettermark branding.
 
 Both apps support Light, System, and Dark theme modes through `document.documentElement.dataset.theme`. Keep new components theme-token based; do not hardcode one-off light-only colors.
+
+### WinPassage update and install policy
+
+WinPassageAdmin installs the local server components by downloading the official `winpassage-server`, `winpassage-agentctl`, and `winpassage-updater` release assets from `https://github.com/rozsazoltan/winpassage`. The app verifies the matching `.sha256` file before copying an executable into `C:\Program Files\WinPassage`. Custom update hosts, mirrors, and alternate repositories are intentionally unsupported.
+
+`winpassage-agentctl` is the small privileged service-control helper. It installs, starts, stops, and removes the Windows Service. `winpassage-updater` is the dedicated boot/update boundary: it should check official releases, verify assets, apply service binary updates, and then leave the WinPassage service running. WinPassageAdmin does not need to start with Windows.
+
+The user interface must stay concise for auditors and security operators: keep install and update actions as buttons, move detailed inputs into modals, avoid crowded dashboards, and keep About clear about what WinPassage is and is not.
+

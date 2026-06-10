@@ -110,33 +110,30 @@ Detailed deployment and service setup belongs in `CONTRIBUTING.md`. This README 
 
 ### Quick install
 
-Download the latest Windows release assets from:
+Download and install **WinPassageAdmin** on the Windows Pro machine that should become the central computer. You do not need to manually copy the server executables next to the app.
+
+Open **WinPassageAdmin** with **Run as administrator**, then choose:
 
 ```text
-https://github.com/rozsazoltan/winpassage/releases/latest
+Overview → Server on this computer → Install on this computer
 ```
 
-On the central Windows Pro machine, place these files in the same folder:
+The admin app downloads these official release assets from GitHub, verifies their matching `.sha256` files, copies them to `C:\Program Files\WinPassage`, installs the Windows Service, and starts it:
 
 ```text
-WinPassageAdmin installer or executable
-WinPassageClient installer or executable
 winpassage-server.exe
 winpassage-agentctl.exe
 winpassage-updater.exe
 ```
 
-Install **WinPassageAdmin** on the central computer, sign in with a local administrator account, open the app, and use **Make this computer a WinPassage server**:
+Only these update sources are accepted:
 
 ```text
-Binary source folder: folder containing the three service executables
-Install folder:       C:\Program Files\WinPassage
-Bind host:            0.0.0.0
-Port:                 4487 or your chosen private-network port
-Admin token:          long random token, at least 16 characters
+https://github.com/rozsazoltan/winpassage
+https://api.github.com/repos/rozsazoltan/winpassage/releases/*
 ```
 
-The service installs the server tools into the install folder and starts the Windows Service. Clients and admin profiles connect with:
+The server listens on the configured IP:port. Clients and additional admin profiles connect with:
 
 ```text
 http://SERVER-IP:PORT
@@ -147,23 +144,6 @@ Example:
 ```text
 http://192.168.1.10:4487
 ```
-
-Install the desktop apps where needed:
-
-```text
-WinPassageAdmin  -> central machine or administrator workstation
-WinPassageClient -> user workstations
-```
-
-Both desktop apps may be installed on the same computer. They are separate applications and their app names intentionally do not contain spaces.
-
-Open **WinPassageAdmin**, add the central machine by IP/DNS address, load users, and test with a disposable local Windows account first.
-
-> [!TIP]
-> If you open WinPassageAdmin from a standard Windows account, the app shows a lock screen. If you are signed in with an administrator account but the app is not elevated, the console opens, but local service install/remove actions still require **Run as administrator**.
-
-> [!IMPORTANT]
-> Do not expose the WinPassage port to the public internet. Keep it on a trusted LAN/VPN and use a long random admin token.
 
 ### Server machine
 
@@ -505,3 +485,12 @@ See: `CONTRIBUTING.md`.
 WinPassage is released under the GNU Affero General Public License v3.0 only.
 
 Created by Zoltán Rózsa.
+
+### WinPassage update and install policy
+
+WinPassageAdmin installs the local server components by downloading the official `winpassage-server`, `winpassage-agentctl`, and `winpassage-updater` release assets from `https://github.com/rozsazoltan/winpassage`. The app verifies the matching `.sha256` file before copying an executable into `C:\Program Files\WinPassage`. Custom update hosts, mirrors, and alternate repositories are intentionally unsupported.
+
+`winpassage-agentctl` is the small privileged service-control helper. It installs, starts, stops, and removes the Windows Service. `winpassage-updater` is the dedicated boot/update boundary: it should check official releases, verify assets, apply service binary updates, and then leave the WinPassage service running. WinPassageAdmin does not need to start with Windows.
+
+The user interface must stay concise for auditors and security operators: keep install and update actions as buttons, move detailed inputs into modals, avoid crowded dashboards, and keep About clear about what WinPassage is and is not.
+

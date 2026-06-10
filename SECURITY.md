@@ -72,3 +72,12 @@ Release deletion is a manual, destructive operation. Use the **Delete Release** 
 ## Client drive mappings
 
 WinPassageClient must not ship default mapped drives. Drive mappings may reveal network structure and must be added explicitly on each workstation. Individual mount/unmount actions must use the current request credentials and must not store passwords.
+
+### WinPassage update and install policy
+
+WinPassageAdmin installs the local server components by downloading the official `winpassage-server`, `winpassage-agentctl`, and `winpassage-updater` release assets from `https://github.com/rozsazoltan/winpassage`. The app verifies the matching `.sha256` file before copying an executable into `C:\Program Files\WinPassage`. Custom update hosts, mirrors, and alternate repositories are intentionally unsupported.
+
+`winpassage-agentctl` is the small privileged service-control helper. It installs, starts, stops, and removes the Windows Service. `winpassage-updater` is the dedicated boot/update boundary: it should check official releases, verify assets, apply service binary updates, and then leave the WinPassage service running. WinPassageAdmin does not need to start with Windows.
+
+The user interface must stay concise for auditors and security operators: keep install and update actions as buttons, move detailed inputs into modals, avoid crowded dashboards, and keep About clear about what WinPassage is and is not.
+

@@ -233,7 +233,7 @@ The admin app requires an elevated Windows administrator account before showing 
 The install form should collect:
 
 ```text
-- source folder containing winpassage-server.exe, winpassage-agentctl.exe, winpassage-updater.exe
+- official GitHub release assets for winpassage-server.exe, winpassage-agentctl.exe, and winpassage-updater.exe, downloaded and SHA-verified by WinPassageAdmin
 - install folder, normally C:\Program Files\WinPassage
 - bind host, normally 0.0.0.0 for private LAN use
 - port, for example 4487
@@ -287,3 +287,12 @@ Tauri release artifact globs must be product-specific. Do not use broad `bundle/
 WinPassage uses a local, dependency-free SVG icon helper inspired by the Nutrino icon pack pattern. App UI icons live in `apps/admin/src/icons.ts` and `apps/client/src/icons.ts`; the product bridge-lock mark lives in `apps/*/src/brand.ts` and is rendered inline as SVG.
 
 The UI intentionally follows a compact professional desktop style: light/dark modes, concise cards, short labels, predictable tables, and settings-first controls. Keep future changes visually restrained and avoid adding default drive mappings or overloaded dashboards.
+
+### WinPassage update and install policy
+
+WinPassageAdmin installs the local server components by downloading the official `winpassage-server`, `winpassage-agentctl`, and `winpassage-updater` release assets from `https://github.com/rozsazoltan/winpassage`. The app verifies the matching `.sha256` file before copying an executable into `C:\Program Files\WinPassage`. Custom update hosts, mirrors, and alternate repositories are intentionally unsupported.
+
+`winpassage-agentctl` is the small privileged service-control helper. It installs, starts, stops, and removes the Windows Service. `winpassage-updater` is the dedicated boot/update boundary: it should check official releases, verify assets, apply service binary updates, and then leave the WinPassage service running. WinPassageAdmin does not need to start with Windows.
+
+The user interface must stay concise for auditors and security operators: keep install and update actions as buttons, move detailed inputs into modals, avoid crowded dashboards, and keep About clear about what WinPassage is and is not.
+
